@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ninja TON</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    
+    <script src='//libtl.com/sdk.js' data-zone='10290091' data-sdk='show_10290091'></script>
+    
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            window.AdBlock19344 = window.Adsgram.init({ blockId: "int-21617" });
+            window.AdBlock19345 = window.Adsgram.init({ blockId: "21618" });
+        });
+    </script>
+</head>
+<body style="background: #000000;">
+    
+    <div class="app-background"></div>
+    
+    <div id="app-loader" style="background: #000000;">
+        <div class="loading-card">
+            <div class="loading-card-header">
+                <div class="loading-card-logo-container">
+                    <img src="https://i.ibb.co/GvWFRrnp/ninja.png" 
+                         alt="Ninja TON" 
+                         class="loading-card-logo"
+                         oncontextmenu="return false;" 
+                         ondragstart="return false;">
+                </div>
+                <h1 class="loading-card-title">NINJA TON V2</h1>
+            </div>
+            
+            <div class="loading-card-body">
+                <div class="loading-progress-container">
+                    <div class="loading-progress-bar" id="loading-progress-bar"></div>
+                </div>
+                <p class="loading-percentage" id="loading-percentage">0%</p>
+                <p class="loading-subtitle">Quick Profits | Verified 100%</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <header class="app-header">
+            <div class="profile-card">
+                <div class="profile-content">
+                    <div class="profile-left">
+                        <div class="user-avatar-container">
+                            <img id="user-photo" class="user-avatar" 
+                                 src="https://cdn-icons-png.flaticon.com/512/9195/9195920.png" 
+                                 alt="User" 
+                                 oncontextmenu="return false;" 
+                                 ondragstart="return false;">
+                        </div>
+                         <div class="user-info-left">
+    <h2 id="user-name" class="user-name">User</h2>
+    <div id="header-ton-balance" class="balance-amount">0.00000 TON</div>
+                         </div>
+                </div>
+            </div>
+        </header>
+        
+        <main id="main-content">
+            <div id="tasks-page" class="page"></div>
+            <div id="quests-page" class="page"></div>
+            <div id="referrals-page" class="page"></div>
+            <div id="withdraw-page" class="page"></div>
+        </main>
+          
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-page="tasks-page">
+                <i class="fas fa-coins"></i>
+                <span>Earn</span>
+            </button>
+            <button class="nav-btn" data-page="quests-page">
+                <i class="fas fa-tasks"></i>
+                <span>Quests</span>
+            </button>
+            <button class="nav-btn" data-page="referrals-page">
+                <i class="fas fa-user-plus"></i>
+                <span>Invite</span>
+            </button>
+            <button class="nav-btn" data-page="withdraw-page">
+                <i class="fas fa-wallet"></i>
+                <span>Withdraw</span>
+            </button>
+        </nav>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+    
+    <script>
+        (function() {
+            'use strict';
+            
+            function showError() {
+                document.body.innerHTML = `
+                    <div class="telegram-error">
+                        <div class="error-content">
+                            <div class="error-header">
+                                <div class="error-icon">
+                                    <i class="fab fa-telegram"></i>
+                                </div>
+                                <h2>Ninja TON</h2>
+                            </div>
+                            
+                            <div class="error-message">
+                                <div class="error-icon-wrapper">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <h3>Access Denied</h3>
+                                <p>This application works only inside Telegram.</p>
+                            </div>
+                            
+                            <a href="https://t.me/NinjaTONS_Bot" target="_blank" class="telegram-btn">
+                                <i class="fab fa-telegram"></i> Open in Telegram
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            function verify() {
+                if (!window.Telegram || !window.Telegram.WebApp) return false;
+                
+                const tg = window.Telegram.WebApp;
+                if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) return false;
+                
+                const user = tg.initDataUnsafe.user;
+                if (!user.id || typeof user.id !== 'number' || user.id <= 0) return false;
+                if (!user.first_name || user.first_name.trim().length === 0) return false;
+                if (!tg.initData || tg.initData.length < 10) return false;
+                
+                return true;
+            }
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                if (!window.Telegram || !window.Telegram.WebApp) {
+                    showError();
+                    return;
+                }
+            });
+            
+        })();
+    </script>
+</body>
+</html>
