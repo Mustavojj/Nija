@@ -1,6 +1,6 @@
 const APP_CONFIG = {
-    APP_NAME: "Ninja TON",
-    BOT_USERNAME: "NINJA2_Rbot",
+    APP_NAME: "CointoCash",
+    BOT_USERNAME: "CointoCash1Bot",
     MINIMUM_WITHDRAW: 0.05,
     REFERRAL_BONUS_TON: 0.003,
     REFERRAL_PERCENTAGE: 10,
