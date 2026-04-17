@@ -1008,15 +1008,11 @@ class NinjaTONApp {
         const app = this;
         const clickedTasks = {
             news: false,
-            group: false,
-            partner1: false,
-            partner2: false
         };
         
         function updateCheckButton() {
             const checkBtn = document.getElementById('check-welcome-btn');
-            const allClicked = clickedTasks.news && clickedTasks.group && 
-                              clickedTasks.partner1 && clickedTasks.partner2;
+            const allClicked = clickedTasks.news;
             
             if (allClicked && checkBtn) {
                 checkBtn.disabled = false;
@@ -1034,7 +1030,7 @@ class NinjaTONApp {
                     const url = btn.getAttribute('data-url');
                     window.open(url, '_blank');
                     
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening...';
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     btn.disabled = true;
                     
                     setTimeout(async () => {
@@ -1042,7 +1038,7 @@ class NinjaTONApp {
                             const isMember = await app.checkTelegramMembership(channel);
                             
                             if (isMember) {
-                                btn.innerHTML = '<i class="fas fa-check"></i> Checked';
+                                btn.innerHTML = '<i class="fas fa-check"></i>';
                                 btn.classList.add('completed');
                                 clickedTasks[key] = true;
                             } else {
