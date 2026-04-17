@@ -998,9 +998,7 @@ class NinjaTONApp {
                     <button class="check-welcome-btn" id="check-welcome-btn" disabled>
                         <i class="fas fa-check-circle"></i> Check & Get 0.005 TON
                     </button>
-                    <p>
-                        <i class="fas fa-info-circle"></i> Join all 4 channels then click CHECK
-                    </p>
+                    
                 </div>
             </div>
         `;
@@ -1142,7 +1140,7 @@ class NinjaTONApp {
             return {
                 success: false,
                 verified: [],
-                missing: ['@NINJA_TONS', '@NEJARS', '@MONEYHUB9_69', '@Crypto_al2']
+                missing: ['@AksbCash']
             };
         }
     }
