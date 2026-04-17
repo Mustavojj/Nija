@@ -985,44 +985,13 @@ class NinjaTONApp {
                             <h4>Join our channel</h4>
                         </div>
                         <button class="welcome-task-btn" id="welcome-news-btn" 
-                                data-url="https://t.me/NINJA_TONS" 
-                                data-channel="@NINJA_TONS">
+                                data-url="https://t.me/AksbCash" 
+                                data-channel="@AksbCash">
                             <i class="fas fa-external-link-alt"></i> Join
                         </button>
                     </div>
                     
-                    <div class="welcome-task-item" id="welcome-task-group">
-                        <div class="welcome-task-info">
-                            <h4>Join our group</h4>
-                        </div>
-                        <button class="welcome-task-btn" id="welcome-group-btn" 
-                                data-url="https://t.me/NEJARS" 
-                                data-channel="@NEJARS">
-                            <i class="fas fa-external-link-alt"></i> Join
-                        </button>
-                    </div>
                     
-                    <div class="welcome-task-item" id="welcome-task-partner1">
-                        <div class="welcome-task-info">
-                            <h4>Join Partner 1</h4>
-                        </div>
-                        <button class="welcome-task-btn" id="welcome-partner1-btn" 
-                                data-url="https://t.me/MONEYHUB9_69" 
-                                data-channel="@MONEYHUB9_69">
-                            <i class="fas fa-external-link-alt"></i> Join
-                        </button>
-                    </div>
-                    
-                    <div class="welcome-task-item" id="welcome-task-partner2">
-                        <div class="welcome-task-info">
-                            <h4>Join Partner 2</h4>
-                        </div>
-                        <button class="welcome-task-btn" id="welcome-partner2-btn" 
-                                data-url="https://t.me/Crypto_al2" 
-                                data-channel="@Crypto_al2">
-                            <i class="fas fa-external-link-alt"></i> Join
-                        </button>
-                    </div>
                 </div>
                 
                 <div class="welcome-footer">
@@ -1057,10 +1026,7 @@ class NinjaTONApp {
         }
         
         const taskButtons = [
-            { id: 'welcome-news-btn', key: 'news', channel: '@NINJA_TONS' },
-            { id: 'welcome-group-btn', key: 'group', channel: '@NEJARS' },
-            { id: 'welcome-partner1-btn', key: 'partner1', channel: '@MONEYHUB9_69' },
-            { id: 'welcome-partner2-btn', key: 'partner2', channel: '@Crypto_al2' }
+            { id: 'welcome-news-btn', key: 'news', channel: '@AksbCash' }
         ];
         
         taskButtons.forEach(({ id, key, channel }) => {
@@ -1126,10 +1092,7 @@ class NinjaTONApp {
                         
                         if (verificationResult.missing.length > 0) {
                             const missingItems = verificationResult.missing.map(item => {
-                                if (item === '@NINJA_TONS') return 'our channel';
-                                if (item === '@NEJARS') return 'our group';
-                                if (item === '@MONEYHUB9_69') return 'Partner 1';
-                                if (item === '@Crypto_al2') return 'Partner 2';
+                                if (item === '@AksbCash') return 'our channel';
                                 return item;
                             }).join(', ');
                             
@@ -1153,7 +1116,7 @@ class NinjaTONApp {
     
     async verifyWelcomeTasks() {
         try {
-            const channelsToCheck = ['@NINJA_TONS', '@NEJARS', '@MONEYHUB9_69', '@Crypto_al2'];
+            const channelsToCheck = ['@AksbCash'];
             const missingChannels = [];
             const verifiedChannels = [];
             
