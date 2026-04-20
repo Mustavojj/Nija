@@ -16,7 +16,7 @@ class CacheManager {
         this.defaultTTL = CORE_CONFIG.CACHE_TTL;
     }
 
-    set(key, value, ttl = this.defaultTTl) {
+    set(key, value, ttl = this.defaultTTL) {
         const expiry = Date.now() + ttl;
         this.cache.set(key, value);
         this.ttl.set(key, expiry);
@@ -200,7 +200,7 @@ class NotificationManager {
                 
                 .notification-progress-fill {
                     height: 100%;
-                    background: #1e40af;
+                    background: #3b82f6;
                     animation: notificationProgress 4s linear forwards;
                 }
                 
