@@ -1410,83 +1410,89 @@ class CointoCashApp {
         `;
     }
 
-    showDepositModal() {
-        const modal = document.createElement('div');
-        modal.className = 'deposit-modal';
-        
-        const memo = this.tgUser.id.toString();
-        const walletAddress = this.settings.tonWallet;
-        
-        modal.innerHTML = `
-            <div class="deposit-modal-content">
-                <button class="deposit-modal-close" id="deposit-modal-close">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="deposit-modal-header">
-                    <h3>Deposit TON</h3>
-                </div>
-                <div class="deposit-field">
-                    <div class="deposit-field-label">
-                        <i class="fas fa-wallet"></i> TON Wallet
-                    </div>
-                    <div class="deposit-field-value" id="deposit-wallet-value">${walletAddress}</div>
-                    <button class="deposit-field-copy" data-copy="wallet">
-                        <i class="far fa-copy"></i> Copy Wallet
-                    </button>
-                </div>
-                <div class="deposit-field">
-                    <div class="deposit-field-label">
-                        <i class="fas fa-comment"></i> Comment (Memo)
-                    </div>
-                    <div class="deposit-field-value" id="deposit-memo-value">${memo}</div>
-                    <button class="deposit-field-copy" data-copy="memo">
-                        <i class="far fa-copy"></i> Copy Memo
-                    </button>
-                </div>
-                <div class="deposit-note" style="margin-top: 20px; padding: 12px; background: #222222; border-radius: 12px; font-size: 0.75rem; color: #9ca3af; text-align: center;">
-                    <i class="fas fa-info-circle"></i> Send TON to this address with the exact memo. Deposits are processed automatically.
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        const closeBtn = document.getElementById('deposit-modal-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                modal.remove();
-            });
-        }
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-        
-        const copyButtons = modal.querySelectorAll('[data-copy]');
-        copyButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const type = btn.dataset.copy;
-                let text = '';
-                if (type === 'wallet') {
-                    text = walletAddress;
-                } else if (type === 'memo') {
-                    text = memo;
-                }
-                if (text) {
-                    this.copyToClipboard(text);
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                    }, 2000);
-                }
-            });
-        });
-    }
 
+
+
+showDepositModal() {
+    const existingModal = document.querySelector('.deposit-modal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'deposit-modal';
+    
+    const memo = this.tgUser.id.toString();
+    const walletAddress = this.settings.tonWallet;
+    
+    modal.innerHTML = `
+        <div class="deposit-modal-content">
+            <button class="deposit-modal-close" id="deposit-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="deposit-modal-header">
+                <h3>Deposit TON</h3>
+            </div>
+            <div class="deposit-field">
+                <div class="deposit-field-label">
+                    <i class="fas fa-wallet"></i> TON Wallet
+                </div>
+                <div class="deposit-field-value" id="deposit-wallet-value">${walletAddress}</div>
+                <button class="deposit-field-copy" data-copy="wallet">
+                    <i class="far fa-copy"></i> Copy Wallet
+                </button>
+            </div>
+            <div class="deposit-field">
+                <div class="deposit-field-label">
+                    <i class="fas fa-comment"></i> Comment (Memo)
+                </div>
+                <div class="deposit-field-value" id="deposit-memo-value">${memo}</div>
+                <button class="deposit-field-copy" data-copy="memo">
+                    <i class="far fa-copy"></i> Copy Memo
+                </button>
+            </div>
+            <div class="deposit-note" style="margin-top: 20px; padding: 12px; background: #222222; border-radius: 12px; font-size: 0.75rem; color: #9ca3af; text-align: center;">
+                <i class="fas fa-info-circle"></i> Send TON to this address with the exact memo. Deposits are processed automatically.
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const closeBtn = modal.querySelector('#deposit-modal-close');
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            modal.remove();
+        };
+    }
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+    
+    const copyButtons = modal.querySelectorAll('[data-copy]');
+    copyButtons.forEach(btn => {
+        btn.onclick = () => {
+            const type = btn.dataset.copy;
+            let text = '';
+            if (type === 'wallet') {
+                text = walletAddress;
+            } else if (type === 'memo') {
+                text = memo;
+            }
+            if (text) {
+                this.copyToClipboard(text);
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }
+        };
+    });
+}
+    
     updateHeader() {
         const userPhoto = document.getElementById('user-photo');
         const userName = document.getElementById('user-name');
@@ -1822,7 +1828,6 @@ class CointoCashApp {
                 <div class="no-data">
                     <i class="fas fa-tasks"></i>
                     <p>No tasks created yet</p>
-                    <p class="hint">Create your first task to earn!</p>
                 </div>
             `;
         }
@@ -2377,8 +2382,7 @@ class CointoCashApp {
                     <div class="no-tasks">
                         <i class="fas fa-users"></i>
                         <p>No social tasks available now</p>
-                        <p class="hint">Click the + button above to create your own task!</p>
-                    </div>
+                   </div>
                 `;
             }
         } catch (error) {
