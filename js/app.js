@@ -93,9 +93,11 @@ class CointoCashApp {
             referralBonus: 0.003,
             referralPercentage: 10,
             taskReward: 0.001,
-            adRewardTon: 0.001,
-            adRewardStar: 1
+            taskPrice100: 0.10,
+            adRewardTon: 0.001
         };
+        
+        this.userCreatedTasks = [];
     }
 
     getRateLimiterClass() {
@@ -226,6 +228,7 @@ class CointoCashApp {
             
             try {
                 await this.loadAdTimers();
+                await this.loadUserCreatedTasks();
             } catch (adError) {
             }
             
@@ -304,8 +307,8 @@ class CointoCashApp {
                 if (settings.referralBonus) this.settings.referralBonus = settings.referralBonus;
                 if (settings.referralPercentage) this.settings.referralPercentage = settings.referralPercentage;
                 if (settings.taskReward) this.settings.taskReward = settings.taskReward;
+                if (settings.taskPrice100) this.settings.taskPrice100 = settings.taskPrice100;
                 if (settings.adRewardTon) this.settings.adRewardTon = settings.adRewardTon;
-                if (settings.adRewardStar) this.settings.adRewardStar = settings.adRewardStar;
             }
         } catch (error) {
         }
@@ -581,7 +584,7 @@ class CointoCashApp {
             id: this.tgUser.id,
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             telegramId: this.tgUser.id,
-            firstName: this.getShortName(this.tgUser.first_name || ''),
+            firstName: this.getShortName(this.tgUser.first_name || '').substring(0, 10),
             photoUrl: this.tgUser.photo_url || 'https://cdn-icons-png.flaticon.com/512/9195/9195920.png',
             balance: 0,
             referrals: 0,
@@ -721,7 +724,7 @@ class CointoCashApp {
         await userRef.update({ 
             lastActive: Date.now(),
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-            firstName: userData.firstName || this.getShortName(this.tgUser.first_name || 'User')
+            firstName: (userData.firstName || this.getShortName(this.tgUser.first_name || 'User')).substring(0, 10)
         });
         
         if (userData.completedTasks && Array.isArray(userData.completedTasks)) {
@@ -1450,11 +1453,16 @@ class CointoCashApp {
         
         const closeBtn = document.getElementById('deposit-modal-close');
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => modal.remove());
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                modal.remove();
+            });
         }
         
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.remove();
+            if (e.target === modal) {
+                modal.remove();
+            }
         });
         
         const copyButtons = modal.querySelectorAll('[data-copy]');
@@ -1493,7 +1501,7 @@ class CointoCashApp {
         
         if (userName) {
             const fullName = this.tgUser.first_name || 'User';
-            userName.textContent = this.truncateName(fullName, 20);
+            userName.textContent = this.truncateName(fullName, 10);
         }
         
         if (tonBalance) {
@@ -1502,6 +1510,7 @@ class CointoCashApp {
         }
         
         if (addBalanceBtn) {
+            addBalanceBtn.onclick = null;
             addBalanceBtn.addEventListener('click', () => {
                 this.showDepositModal();
             });
@@ -1691,7 +1700,7 @@ class CointoCashApp {
 
     showAddTaskModal() {
         const completionsOptions = [100, 250, 500, 1000, 5000, 10000];
-        const taskPricePer100 = 10;
+        const taskPricePer100 = this.settings.taskPrice100;
         
         const modal = document.createElement('div');
         modal.className = 'task-modal';
@@ -1758,10 +1767,10 @@ class CointoCashApp {
                             </label>
                             <div class="completions-selector">
                                 ${completionsOptions.map(opt => {
-                                    let price = Math.floor(opt / 100) * taskPricePer100;
-                                    if (opt === 250) price = 250;
+                                    let price = (opt / 100) * taskPricePer100;
+                                    if (opt === 250) price = 2.5 * taskPricePer100;
                                     return `
-                                        <div class="completion-option ${opt === 100 ? 'active' : ''}" data-completions="${opt}" data-price="${price}">${opt}</div>
+                                        <div class="completion-option ${opt === 100 ? 'active' : ''}" data-completions="${opt}" data-price="${price.toFixed(4)}">${opt}</div>
                                     `;
                                 }).join('')}
                             </div>
@@ -1769,13 +1778,13 @@ class CointoCashApp {
                         
                         <div class="price-info">
                             <span class="price-label">Total Price:</span>
-                            <span class="price-value" id="total-price">${taskPricePer100} STAR</span>
+                            <span class="price-value" id="total-price">${taskPricePer100.toFixed(4)} TON</span>
                         </div>
                         
                         <div class="task-message" id="task-message" style="display: none;"></div>
                         
                         <button type="button" class="pay-task-btn" id="pay-task-btn" disabled>
-                            <i class="fas fa-coins"></i> Pay ${taskPricePer100} STAR
+                            <i class="fas fa-coins"></i> Pay ${taskPricePer100.toFixed(4)} TON
                         </button>
                     </form>
                 </div>
@@ -1792,7 +1801,8 @@ class CointoCashApp {
         
         const closeBtn = document.getElementById('task-modal-close');
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 modal.remove();
             });
         }
@@ -1812,7 +1822,7 @@ class CointoCashApp {
                 <div class="no-data">
                     <i class="fas fa-tasks"></i>
                     <p>No tasks created yet</p>
-                    <p class="hint">Create your first task to earn STAR!</p>
+                    <p class="hint">Create your first task to earn!</p>
                 </div>
             `;
         }
@@ -1935,9 +1945,9 @@ class CointoCashApp {
                 completionOptions.forEach(o => o.classList.remove('active'));
                 opt.classList.add('active');
                 
-                const price = parseInt(opt.dataset.price);
-                totalPriceSpan.textContent = `${price} STAR`;
-                payBtn.innerHTML = `<i class="fas fa-coins"></i> Pay ${price} STAR`;
+                const price = parseFloat(opt.dataset.price);
+                totalPriceSpan.textContent = `${price.toFixed(4)} TON`;
+                payBtn.innerHTML = `<i class="fas fa-coins"></i> Pay ${price.toFixed(4)} TON`;
                 
                 this.checkTaskFormComplete(modal);
             });
@@ -2015,8 +2025,8 @@ class CointoCashApp {
         const currentCompletions = task.currentCompletions || 0;
         const maxCompletions = task.maxCompletions || 100;
         const remaining = maxCompletions - currentCompletions;
-        const taskPricePer100 = 10;
-        const refundAmount = Math.floor(currentCompletions / 100) * taskPricePer100 * 0.5;
+        const taskPricePer100 = this.settings.taskPrice100;
+        const refundAmount = (currentCompletions / 100) * taskPricePer100 * 0.5;
         
         const modal = document.createElement('div');
         modal.className = 'task-modal';
@@ -2035,7 +2045,7 @@ class CointoCashApp {
                 
                 <div class="price-info" style="background: rgba(231, 76, 60, 0.2);">
                     <span class="price-label">Refund (50% of completed):</span>
-                    <span class="price-value" style="color: #e74c3c;">${refundAmount.toFixed(0)} STAR</span>
+                    <span class="price-value" style="color: #e74c3c;">${refundAmount.toFixed(4)} TON</span>
                 </div>
                 
                 <div class="task-message" id="delete-task-message" style="display: none;"></div>
@@ -2051,7 +2061,10 @@ class CointoCashApp {
         
         const closeBtn = document.getElementById('delete-task-close');
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => modal.remove());
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                modal.remove();
+            });
         }
         
         modal.addEventListener('click', (e) => {
@@ -2075,12 +2088,12 @@ class CointoCashApp {
                     if (this.db) {
                         await this.db.ref(`config/userTasks/${this.tgUser.id}/${task.id}`).remove();
                         
-                        const newSTAR = this.safeNumber(this.userState.star) + refundAmount;
+                        const newBalance = this.safeNumber(this.userState.balance) + refundAmount;
                         await this.db.ref(`users/${this.tgUser.id}`).update({
-                            star: newSTAR
+                            balance: newBalance
                         });
                         
-                        this.userState.star = newSTAR;
+                        this.userState.balance = newBalance;
                     }
                     
                     await this.loadUserCreatedTasks();
@@ -2089,7 +2102,7 @@ class CointoCashApp {
                     
                     const messageDiv = document.getElementById('delete-task-message');
                     if (messageDiv) {
-                        messageDiv.textContent = `Task deleted! Refunded ${refundAmount.toFixed(0)} STAR`;
+                        messageDiv.textContent = `Task deleted! Refunded ${refundAmount.toFixed(4)} TON`;
                         messageDiv.className = 'task-message success';
                         messageDiv.style.display = 'block';
                     }
@@ -2157,14 +2170,14 @@ class CointoCashApp {
                 }
             }
             
-            const taskPricePer100 = 10;
-            let price = Math.floor(completions / 100) * taskPricePer100;
-            if (completions === 250) price = 250;
+            const taskPricePer100 = this.settings.taskPrice100;
+            let price = (completions / 100) * taskPricePer100;
+            if (completions === 250) price = 2.5 * taskPricePer100;
             
-            const userSTAR = this.safeNumber(this.userState.star);
+            const userBalance = this.safeNumber(this.userState.balance);
             
-            if (userSTAR < price) {
-                this.showMessage(modal, 'Insufficient STAR balance', 'error');
+            if (userBalance < price) {
+                this.showMessage(modal, `Insufficient TON balance. Need ${price.toFixed(4)} TON`, 'error');
                 return;
             }
             
@@ -2198,7 +2211,6 @@ class CointoCashApp {
                     currentCompletions: 0,
                     status: 'active',
                     reward: this.settings.taskReward,
-                    starReward: 1,
                     owner: this.tgUser.id,
                     createdAt: currentTime,
                     picture: 'https://i.ibb.co/GvWFRrnp/ninja.png'
@@ -2208,12 +2220,12 @@ class CointoCashApp {
                     const taskRef = await this.db.ref(`config/userTasks/${this.tgUser.id}`).push(taskData);
                     const taskId = taskRef.key;
                     
-                    const newSTAR = userSTAR - price;
+                    const newBalance = userBalance - price;
                     await this.db.ref(`users/${this.tgUser.id}`).update({
-                        star: newSTAR
+                        balance: newBalance
                     });
                     
-                    this.userState.star = newSTAR;
+                    this.userState.balance = newBalance;
                     
                     await this.loadUserCreatedTasks();
                     
@@ -2223,7 +2235,7 @@ class CointoCashApp {
                         this.setupMyTaskButtons(modal);
                     }
                     
-                    this.showMessage(modal, `Task created! Cost: ${price} STAR`, 'success');
+                    this.showMessage(modal, `Task created! Cost: ${price.toFixed(4)} TON`, 'success');
                     
                     setTimeout(() => {
                         const messageDiv = modal.querySelector('#task-message');
@@ -2887,7 +2899,7 @@ class CointoCashApp {
                     </div>
                     <div class="quest-reward-display">
                         <div class="reward-icon">
-                            <img src="https://cdn-icons-png.flaticon.com/512/15208/15208522.png" alt="TON" class="ton-reward-icon">
+                            <img src="https://cdn-icons-png.flaticon.com/512/15208/15208522.png" alt="TON" style="width: 28px; height: 28px; object-fit: contain;">
                         </div>
                         <div class="reward-amount">
                             <span class="reward-value">Reward: ${reward.toFixed(3)} TON</span>
@@ -3083,7 +3095,7 @@ class CointoCashApp {
                             </div>
                             <div class="stat-info">
                                 <h4>Total Earnings</h4>
-                                <p class="stat-value">${referralEarnings.toFixed(5)} TON</p>
+                                <p class="stat-value">${referralEarnings.toFixed(3)} TON</p>
                             </div>
                         </div>
                     </div>
@@ -3436,10 +3448,10 @@ class CointoCashApp {
 
     getShortName(name) {
         if (!name) return 'User';
-        return name;
+        return name.substring(0, 10);
     }
 
-    truncateName(name, maxLength = 20) {
+    truncateName(name, maxLength = 10) {
         if (!name) return 'User';
         if (name.length <= maxLength) return name;
         return name.substring(0, maxLength) + '...';
