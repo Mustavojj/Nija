@@ -1580,7 +1580,7 @@ class CointoCashApp {
         
         if (userName) {
             const fullName = this.tgUser.first_name || 'User';
-            userName.textContent = this.truncateName(fullName, 10);
+            userName.textContent = this.truncateName(fullName, 15);
         }
         
         if (tonBalance) {
