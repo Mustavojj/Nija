@@ -9,8 +9,8 @@ const DEFAULT_SETTINGS = {
     welcomeTasks: [
         { name: "Join our channel", url: "https://t.me/AksbCash", reward: 0.005 }
     ],
-    defaultTaskIcon: "https://i.ibb.co/2132FSB2/file-000000004be47246b5749d02cb324e6c.png",
-    defaultUserIcon: "https://i.ibb.co/2132FSB2/file-000000004be47246b5749d02cb324e6c.png",
+    defaultTaskIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
+    defaultUserIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
     tonIcon: "https://cdn-icons-png.flaticon.com/512/12114/12114247.png"
 };
 
