@@ -80,7 +80,6 @@ class TaskManager {
                             tasks.push(task);
                         }
                     } catch (error) {
-                        console.error('Error processing task:', error);
                     }
                 });
             }
@@ -88,7 +87,6 @@ class TaskManager {
             return tasks;
             
         } catch (error) {
-            console.error(`Error loading ${category} tasks:`, error);
             return [];
         }
     }
@@ -119,7 +117,6 @@ class TaskManager {
             });
             
             if (!response.ok) {
-                console.error('Bot admin check failed');
                 return false;
             }
             
@@ -128,14 +125,13 @@ class TaskManager {
                 const admins = data.result;
                 const isBotAdmin = admins.some(admin => {
                     const isBot = admin.user?.is_bot;
-                    const isThisBot = admin.user?.username === 'NinjaTONS_Bot';
+                    const isThisBot = admin.user?.username === this.app.appConfig.BOT_USERNAME;
                     return isBot && isThisBot;
                 });
                 return isBotAdmin;
             }
             return false;
         } catch (error) {
-            console.error('Error checking bot admin status:', error);
             return false;
         }
     }
@@ -169,7 +165,6 @@ class TaskManager {
             const userStatus = data.result.status;
             return ['member', 'administrator', 'creator', 'restricted'].includes(userStatus);
         } catch (error) {
-            console.error('Error checking user membership with bot:', error);
             return false;
         }
     }
@@ -405,9 +400,9 @@ class TaskManager {
             this.enableAllTaskButtons();
             this.app.isProcessingTask = false;
 
-           if (this.app.userState.referredBy) {
-            await this.app.processReferralTaskBonus(this.app.userState.referredBy, taskReward);
-                                  }
+            if (this.app.userState.referredBy) {
+                await this.app.processReferralTaskBonus(this.app.userState.referredBy, taskReward);
+            }
             
             return true;
             
