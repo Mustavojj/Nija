@@ -1,3 +1,19 @@
+const DEFAULT_SETTINGS = {
+    tonWallet: "TON-WALLET",
+    minimumWithdraw: 0.05,
+    referralBonus: 0.003,
+    referralPercentage: 10,
+    taskReward: 0.001,
+    taskPrice100: 0.10,
+    adRewardTon: 0.001,
+    welcomeTasks: [
+        { name: "Join our channel", url: "https://t.me/AksbCash", reward: 0.005 }
+    ],
+    defaultTaskIcon: "https://i.ibb.co/2132FSB2/file-000000004be47246b5749d02cb324e6c.png",
+    defaultUserIcon: "https://i.ibb.co/2132FSB2/file-000000004be47246b5749d02cb324e6c.png",
+    tonIcon: "https://cdn-icons-png.flaticon.com/512/12114/12114247.png"
+};
+
 const APP_CONFIG = {
     APP_NAME: "CointoCash",
     BOT_USERNAME: "CointoCash1Bot",
@@ -75,10 +91,7 @@ class CointoCashApp {
         
         this.welcomeTasksShown = false;
         this.welcomeTasksCompleted = false;
-        this.welcomeTasksVerified = {
-            newsChannel: false,
-            group: false
-        };
+        this.welcomeTasksList = [];
         
         this.remoteConfig = null;
         this.configCache = null;
@@ -87,15 +100,7 @@ class CointoCashApp {
         this.pendingReferralAfterWelcome = null;
         this.rateLimiter = new (this.getRateLimiterClass())();
         
-        this.settings = {
-            tonWallet: "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            minimumWithdraw: 0.05,
-            referralBonus: 0.003,
-            referralPercentage: 10,
-            taskReward: 0.001,
-            taskPrice100: 0.10,
-            adRewardTon: 0.001
-        };
+        this.settings = { ...DEFAULT_SETTINGS };
         
         this.userCreatedTasks = [];
     }
@@ -295,6 +300,34 @@ class CointoCashApp {
         }
     }
 
+    async loadWelcomeTasksFromFirebase() {
+        try {
+            if (!this.db) {
+                this.welcomeTasksList = this.settings.welcomeTasks || DEFAULT_SETTINGS.welcomeTasks;
+                return;
+            }
+            
+            const welcomeTasksRef = await this.db.ref('config/welcomeTasks').once('value');
+            if (welcomeTasksRef.exists()) {
+                const tasks = [];
+                welcomeTasksRef.forEach(child => {
+                    tasks.push({
+                        id: child.key,
+                        ...child.val()
+                    });
+                });
+                if (tasks.length > 0) {
+                    this.welcomeTasksList = tasks;
+                    return;
+                }
+            }
+            
+            this.welcomeTasksList = this.settings.welcomeTasks || DEFAULT_SETTINGS.welcomeTasks;
+        } catch (error) {
+            this.welcomeTasksList = this.settings.welcomeTasks || DEFAULT_SETTINGS.welcomeTasks;
+        }
+    }
+
     async loadSettingsFromFirebase() {
         try {
             if (!this.db) return;
@@ -309,7 +342,13 @@ class CointoCashApp {
                 if (settings.taskReward) this.settings.taskReward = settings.taskReward;
                 if (settings.taskPrice100) this.settings.taskPrice100 = settings.taskPrice100;
                 if (settings.adRewardTon) this.settings.adRewardTon = settings.adRewardTon;
+                if (settings.defaultTaskIcon) this.settings.defaultTaskIcon = settings.defaultTaskIcon;
+                if (settings.defaultUserIcon) this.settings.defaultUserIcon = settings.defaultUserIcon;
+                if (settings.tonIcon) this.settings.tonIcon = settings.tonIcon;
+                if (settings.welcomeTasks) this.settings.welcomeTasks = settings.welcomeTasks;
             }
+            
+            await this.loadWelcomeTasksFromFirebase();
         } catch (error) {
         }
     }
@@ -526,7 +565,7 @@ class CointoCashApp {
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             telegramId: this.tgUser.id,
             firstName: this.getShortName(this.tgUser.first_name || 'User'),
-            photoUrl: this.tgUser.photo_url || 'https://cdn-icons-png.flaticon.com/512/9195/9195920.png',
+            photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
             referralCode: this.generateReferralCode(),
@@ -565,7 +604,7 @@ class CointoCashApp {
                         userId: this.tgUser.id,
                         username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
                         firstName: this.getShortName(this.tgUser.first_name || ''),
-                        photoUrl: this.tgUser.photo_url || 'https://cdn-icons-png.flaticon.com/512/9195/9195920.png',
+                        photoUrl: this.settings.defaultUserIcon,
                         joinedAt: Date.now(),
                         state: 'pending',
                         bonusGiven: false,
@@ -585,7 +624,7 @@ class CointoCashApp {
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             telegramId: this.tgUser.id,
             firstName: this.getShortName(this.tgUser.first_name || '').substring(0, 10),
-            photoUrl: this.tgUser.photo_url || 'https://cdn-icons-png.flaticon.com/512/9195/9195920.png',
+            photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
             referredBy: referralId,
@@ -1001,8 +1040,32 @@ class CointoCashApp {
             return;
         }
         
+        if (this.welcomeTasksList.length === 0) {
+            await this.loadWelcomeTasksFromFirebase();
+        }
+        
         const modal = document.createElement('div');
         modal.className = 'welcome-tasks-modal';
+        
+        const tasksHtml = this.welcomeTasksList.map((task, index) => `
+            <div class="welcome-task-item" id="welcome-task-${index}">
+                <div class="welcome-task-info">
+                    <h4>${this.escapeHtml(task.name)}</h4>
+                    <div class="welcome-task-reward">Reward: ${(task.reward || 0.005).toFixed(3)} TON</div>
+                </div>
+                <div style="flex-direction: column; align-items: flex-end;">
+                    <button class="welcome-task-btn" id="welcome-task-btn-${index}" 
+                            data-url="${task.url}" 
+                            data-reward="${task.reward || 0.005}"
+                            data-name="${this.escapeHtml(task.name)}">
+                        <i class="fas fa-external-link-alt"></i> Join
+                    </button>
+                    <div class="welcome-task-error" id="welcome-task-error-${index}"></div>
+                </div>
+            </div>
+        `).join('');
+        
+        const totalReward = this.welcomeTasksList.reduce((sum, task) => sum + (task.reward || 0.005), 0);
         
         modal.innerHTML = `
             <div class="welcome-tasks-content">
@@ -1011,28 +1074,16 @@ class CointoCashApp {
                         <i class="fas fa-gift"></i>
                     </div>
                     <h3>Welcome Tasks</h3>
-                    <p>Join all channels to claim your bonus</p>
+                    <p>Complete tasks to earn ${totalReward.toFixed(3)} TON bonus</p>
                 </div>
                 
                 <div class="welcome-tasks-list">
-                    <div class="welcome-task-item" id="welcome-task-news">
-                        <div class="welcome-task-info">
-                            <h4>Join our channel</h4>
-                        </div>
-                        <div style="flex-direction: column; align-items: flex-end;">
-                            <button class="welcome-task-btn" id="welcome-news-btn" 
-                                    data-url="https://t.me/AksbCash" 
-                                    data-channel="@AksbCash">
-                                <i class="fas fa-external-link-alt"></i> Join
-                            </button>
-                            <div class="welcome-task-error" id="welcome-news-error"></div>
-                        </div>
-                    </div>
+                    ${tasksHtml}
                 </div>
                 
                 <div class="welcome-footer">
                     <button class="check-welcome-btn" id="check-welcome-btn" disabled>
-                        <i class="fas fa-check-circle"></i> Check & Get 0.005 TON
+                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(3)} TON
                     </button>
                 </div>
             </div>
@@ -1041,13 +1092,17 @@ class CointoCashApp {
         document.body.appendChild(modal);
         
         const app = this;
-        const clickedTasks = {
-            news: false,
-        };
+        const clickedTasks = {};
+        const taskRewards = {};
+        
+        this.welcomeTasksList.forEach((task, index) => {
+            clickedTasks[index] = false;
+            taskRewards[index] = task.reward || 0.005;
+        });
         
         function updateCheckButton() {
             const checkBtn = document.getElementById('check-welcome-btn');
-            const allClicked = clickedTasks.news;
+            const allClicked = Object.values(clickedTasks).every(v => v === true);
             
             if (allClicked && checkBtn) {
                 checkBtn.disabled = false;
@@ -1055,7 +1110,7 @@ class CointoCashApp {
         }
         
         function showTaskError(taskId, message) {
-            const errorDiv = document.getElementById(`${taskId}-error`);
+            const errorDiv = document.getElementById(`welcome-task-error-${taskId}`);
             if (errorDiv) {
                 errorDiv.textContent = message;
                 errorDiv.classList.add('show');
@@ -1065,15 +1120,12 @@ class CointoCashApp {
             }
         }
         
-        const taskButtons = [
-            { id: 'welcome-news-btn', key: 'news', channel: '@AksbCash', errorId: 'welcome-news-error' }
-        ];
-        
-        taskButtons.forEach(({ id, key, channel, errorId }) => {
-            const btn = document.getElementById(id);
+        this.welcomeTasksList.forEach((task, index) => {
+            const btn = document.getElementById(`welcome-task-btn-${index}`);
             if (btn) {
                 btn.addEventListener('click', async () => {
                     const url = btn.getAttribute('data-url');
+                    const channelUsername = this.extractChannelUsername(url);
                     window.open(url, '_blank');
                     
                     const originalText = btn.innerHTML;
@@ -1082,21 +1134,26 @@ class CointoCashApp {
                     
                     setTimeout(async () => {
                         try {
-                            const isMember = await app.checkTelegramMembership(channel);
+                            let isMember = false;
+                            if (channelUsername) {
+                                isMember = await app.checkTelegramMembership(channelUsername);
+                            } else {
+                                isMember = true;
+                            }
                             
                             if (isMember) {
                                 btn.innerHTML = '<i class="fas fa-check"></i> Joined';
                                 btn.classList.add('completed');
-                                clickedTasks[key] = true;
-                                const errorDiv = document.getElementById(errorId);
+                                clickedTasks[index] = true;
+                                const errorDiv = document.getElementById(`welcome-task-error-${index}`);
                                 if (errorDiv) {
                                     errorDiv.classList.remove('show');
                                 }
                             } else {
                                 btn.innerHTML = originalText;
                                 btn.disabled = false;
-                                clickedTasks[key] = false;
-                                showTaskError(errorId, `Please join ${channel} first`);
+                                clickedTasks[index] = false;
+                                showTaskError(index, `Please join ${task.name} first`);
                             }
                             
                             updateCheckButton();
@@ -1104,7 +1161,7 @@ class CointoCashApp {
                         } catch (error) {
                             btn.innerHTML = originalText;
                             btn.disabled = false;
-                            showTaskError(errorId, 'Verification failed. Please try again.');
+                            showTaskError(index, 'Verification failed. Please try again.');
                         }
                     }, 10000);
                 });
@@ -1126,23 +1183,19 @@ class CointoCashApp {
                         await app.completeWelcomeTasks();
                         modal.remove();
                         app.showPage('tasks-page');
-                        app.notificationManager.showNotification("Success", "Welcome tasks completed! +0.005 TON", "success");
+                        app.notificationManager.showNotification("Success", `Welcome tasks completed! +${totalReward.toFixed(3)} TON`, "success");
                     } else {
-                        checkBtn.innerHTML = '<i class="fas fa-check-circle"></i> Check & Get 0.005 TON';
+                        checkBtn.innerHTML = '<i class="fas fa-check-circle"></i> Check & Get ' + totalReward.toFixed(3) + ' TON';
                         checkBtn.disabled = false;
                         
                         if (verificationResult.missing.length > 0) {
-                            const missingItems = verificationResult.missing.map(item => {
-                                if (item === '@AksbCash') return 'our channel';
-                                return item;
-                            }).join(', ');
-                            
-                            showTaskError('welcome-news-error', `Please join: ${missingItems}`);
+                            const missingItems = verificationResult.missing.join(', ');
+                            app.notificationManager.showNotification("Incomplete", `Please join: ${missingItems}`, "warning");
                         }
                     }
                 } catch (error) {
                     app.notificationManager.showNotification("Error", "Failed to verify tasks", "error");
-                    checkBtn.innerHTML = '<i class="fas fa-check-circle"></i> Check & Get 0.005 TON';
+                    checkBtn.innerHTML = '<i class="fas fa-check-circle"></i> Check & Get ' + totalReward.toFixed(3) + ' TON';
                     checkBtn.disabled = false;
                 }
             });
@@ -1151,22 +1204,45 @@ class CointoCashApp {
         this.welcomeTasksShown = true;
     }
     
+    extractChannelUsername(url) {
+        try {
+            if (!url) return null;
+            const match = url.match(/t\.me\/([^\/\?]+)/);
+            if (match && match[1]) {
+                let username = match[1];
+                if (!username.startsWith('@')) {
+                    username = '@' + username;
+                }
+                return username;
+            }
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+    
     async verifyWelcomeTasks() {
         try {
-            const channelsToCheck = ['@AksbCash'];
             const missingChannels = [];
             const verifiedChannels = [];
             
-            for (const channel of channelsToCheck) {
-                const isMember = await this.checkTelegramMembership(channel);
+            for (const task of this.welcomeTasksList) {
+                const channelUsername = this.extractChannelUsername(task.url);
+                let isMember = false;
                 
-                if (isMember) {
-                    verifiedChannels.push(channel);
+                if (channelUsername) {
+                    isMember = await this.checkTelegramMembership(channelUsername);
                 } else {
-                    missingChannels.push(channel);
+                    isMember = true;
                 }
                 
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (isMember) {
+                    verifiedChannels.push(task.name);
+                } else {
+                    missingChannels.push(task.name);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
             return {
@@ -1179,7 +1255,7 @@ class CointoCashApp {
             return {
                 success: false,
                 verified: [],
-                missing: ['@AksbCash']
+                missing: this.welcomeTasksList.map(t => t.name)
             };
         }
     }
@@ -1228,14 +1304,14 @@ class CointoCashApp {
     
     async completeWelcomeTasks() {
         try {
-            const reward = 0.005;
+            const totalReward = this.welcomeTasksList.reduce((sum, task) => sum + (task.reward || 0.005), 0);
             const currentBalance = this.safeNumber(this.userState.balance);
-            const newBalance = currentBalance + reward;
+            const newBalance = currentBalance + totalReward;
             
             if (this.db) {
                 await this.db.ref(`users/${this.tgUser.id}`).update({
                     balance: newBalance,
-                    totalEarned: this.safeNumber(this.userState.totalEarned) + reward,
+                    totalEarned: this.safeNumber(this.userState.totalEarned) + totalReward,
                     totalTasks: this.safeNumber(this.userState.totalTasks),
                     welcomeTasksCompleted: true,
                     welcomeTasksCompletedAt: Date.now(),
@@ -1244,7 +1320,7 @@ class CointoCashApp {
             }
             
             this.userState.balance = newBalance;
-            this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + reward;
+            this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + totalReward;
             this.userState.welcomeTasksCompleted = true;
             this.userState.welcomeTasksCompletedAt = Date.now();
             this.userState.welcomeTasksVerifiedAt = Date.now();
@@ -1410,88 +1486,85 @@ class CointoCashApp {
         `;
     }
 
-
-
-
-showDepositModal() {
-    const existingModal = document.querySelector('.deposit-modal');
-    if (existingModal) existingModal.remove();
-    
-    const modal = document.createElement('div');
-    modal.className = 'deposit-modal';
-    
-    const memo = this.tgUser.id.toString();
-    const walletAddress = this.settings.tonWallet;
-    
-    modal.innerHTML = `
-        <div class="deposit-modal-content">
-            <button class="deposit-modal-close" id="deposit-modal-close">
-                <i class="fas fa-times"></i>
-            </button>
-            <div class="deposit-modal-header">
-                <h3>Deposit TON</h3>
-            </div>
-            <div class="deposit-field">
-                <div class="deposit-field-label">
-                    <i class="fas fa-wallet"></i> TON Wallet
-                </div>
-                <div class="deposit-field-value" id="deposit-wallet-value">${walletAddress}</div>
-                <button class="deposit-field-copy" data-copy="wallet">
-                    <i class="far fa-copy"></i> Copy Wallet
+    showDepositModal() {
+        const existingModal = document.querySelector('.deposit-modal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.className = 'deposit-modal';
+        
+        const memo = this.tgUser.id.toString();
+        const walletAddress = this.settings.tonWallet;
+        
+        modal.innerHTML = `
+            <div class="deposit-modal-content">
+                <button class="deposit-modal-close" id="deposit-modal-close">
+                    <i class="fas fa-times"></i>
                 </button>
-            </div>
-            <div class="deposit-field">
-                <div class="deposit-field-label">
-                    <i class="fas fa-comment"></i> Comment (Memo)
+                <div class="deposit-modal-header">
+                    <h3>Deposit TON</h3>
                 </div>
-                <div class="deposit-field-value" id="deposit-memo-value">${memo}</div>
-                <button class="deposit-field-copy" data-copy="memo">
-                    <i class="far fa-copy"></i> Copy Memo
-                </button>
+                <div class="deposit-field">
+                    <div class="deposit-field-label">
+                        <i class="fas fa-wallet"></i> TON Wallet
+                    </div>
+                    <div class="deposit-field-value" id="deposit-wallet-value">${walletAddress}</div>
+                    <button class="deposit-field-copy" data-copy="wallet">
+                        <i class="far fa-copy"></i> Copy Wallet
+                    </button>
+                </div>
+                <div class="deposit-field">
+                    <div class="deposit-field-label">
+                        <i class="fas fa-comment"></i> Comment (Memo)
+                    </div>
+                    <div class="deposit-field-value" id="deposit-memo-value">${memo}</div>
+                    <button class="deposit-field-copy" data-copy="memo">
+                        <i class="far fa-copy"></i> Copy Memo
+                    </button>
+                </div>
+                <div class="deposit-note" style="margin-top: 20px; padding: 12px; background: #222222; border-radius: 12px; font-size: 0.75rem; color: #9ca3af; text-align: center;">
+                    <i class="fas fa-info-circle"></i> Send TON to this address with the exact memo. Deposits are processed automatically.
+                </div>
             </div>
-            <div class="deposit-note" style="margin-top: 20px; padding: 12px; background: #222222; border-radius: 12px; font-size: 0.75rem; color: #9ca3af; text-align: center;">
-                <i class="fas fa-info-circle"></i> Send TON to this address with the exact memo. Deposits are processed automatically.
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    const closeBtn = modal.querySelector('#deposit-modal-close');
-    if (closeBtn) {
-        closeBtn.onclick = (e) => {
-            e.stopPropagation();
-            modal.remove();
-        };
-    }
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            modal.remove();
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const closeBtn = modal.querySelector('#deposit-modal-close');
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.stopPropagation();
+                modal.remove();
+            };
         }
-    };
-    
-    const copyButtons = modal.querySelectorAll('[data-copy]');
-    copyButtons.forEach(btn => {
-        btn.onclick = () => {
-            const type = btn.dataset.copy;
-            let text = '';
-            if (type === 'wallet') {
-                text = walletAddress;
-            } else if (type === 'memo') {
-                text = memo;
-            }
-            if (text) {
-                this.copyToClipboard(text);
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                }, 2000);
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.remove();
             }
         };
-    });
-}
+        
+        const copyButtons = modal.querySelectorAll('[data-copy]');
+        copyButtons.forEach(btn => {
+            btn.onclick = () => {
+                const type = btn.dataset.copy;
+                let text = '';
+                if (type === 'wallet') {
+                    text = walletAddress;
+                } else if (type === 'memo') {
+                    text = memo;
+                }
+                if (text) {
+                    this.copyToClipboard(text);
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                    }, 2000);
+                }
+            };
+        });
+    }
     
     updateHeader() {
         const userPhoto = document.getElementById('user-photo');
@@ -1500,7 +1573,7 @@ showDepositModal() {
         const addBalanceBtn = document.getElementById('add-balance-btn');
         
         if (userPhoto) {
-            userPhoto.src = this.userState.photoUrl || 'https://cdn-icons-png.flaticon.com/512/9195/9195920.png';
+            userPhoto.src = this.userState.photoUrl || this.settings.defaultUserIcon;
             userPhoto.oncontextmenu = (e) => e.preventDefault();
             userPhoto.ondragstart = () => false;
         }
@@ -1654,7 +1727,7 @@ showDepositModal() {
                             <div class="ad-title">Watch AD #1</div>
                         </div>
                         <div class="ad-reward">
-                            <img src="https://cdn-icons-png.flaticon.com/512/12114/12114247.png" alt="TON">
+                            <img src="${this.settings.tonIcon}" alt="TON">
                             <span>Reward: ${this.settings.adRewardTon.toFixed(3)} TON</span>
                         </div>
                         <button class="ad-btn ${this.isAdAvailable(1) ? 'available' : 'cooldown'}" 
@@ -1671,7 +1744,7 @@ showDepositModal() {
                             <div class="ad-title">Watch AD #2</div>
                         </div>
                         <div class="ad-reward">
-                            <img src="https://cdn-icons-png.flaticon.com/512/12114/12114247.png" alt="TON">
+                            <img src="${this.settings.tonIcon}" alt="TON">
                             <span>Reward: ${this.settings.adRewardTon.toFixed(3)} TON</span>
                         </div>
                         <button class="ad-btn ${this.isAdAvailable(2) ? 'available' : 'cooldown'}" 
@@ -1843,7 +1916,7 @@ showDepositModal() {
                 <div class="my-task-item" data-task-id="${task.id}">
                     <div class="my-task-header">
                         <div class="my-task-avatar">
-                            <img src="https://i.ibb.co/GvWFRrnp/ninja.png" alt="Task">
+                            <img src="${this.settings.defaultTaskIcon}" alt="Task">
                         </div>
                         <div class="my-task-info">
                             <div class="my-task-name">${task.name} ${verification}</div>
@@ -2218,7 +2291,7 @@ showDepositModal() {
                     reward: this.settings.taskReward,
                     owner: this.tgUser.id,
                     createdAt: currentTime,
-                    picture: 'https://i.ibb.co/GvWFRrnp/ninja.png'
+                    picture: this.settings.defaultTaskIcon
                 };
                 
                 if (this.db) {
@@ -2264,6 +2337,39 @@ showDepositModal() {
         }
     }
 
+    async checkBotAdminStatus(chatId) {
+        try {
+            const response = await fetch('/api/telegram-bot', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-user-id': this.tgUser.id.toString(),
+                    'x-telegram-hash': this.tg?.initData || ''
+                },
+                body: JSON.stringify({
+                    action: 'getChatAdministrators',
+                    params: { chat_id: chatId }
+                })
+            });
+            
+            if (!response.ok) return false;
+            
+            const data = await response.json();
+            if (data.ok && data.result) {
+                const admins = data.result;
+                const isBotAdmin = admins.some(admin => {
+                    const isBot = admin.user?.is_bot;
+                    const isThisBot = admin.user?.username === this.appConfig.BOT_USERNAME;
+                    return isBot && isThisBot;
+                });
+                return isBotAdmin;
+            }
+            return false;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async loadUserCreatedTasks() {
         try {
             if (!this.db) return;
@@ -2298,39 +2404,6 @@ showDepositModal() {
                     messageDiv.style.display = 'none';
                 }, 3000);
             }
-        }
-    }
-
-    async checkBotAdminStatus(chatId) {
-        try {
-            const response = await fetch('/api/telegram-bot', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-user-id': this.tgUser.id.toString(),
-                    'x-telegram-hash': this.tg?.initData || ''
-                },
-                body: JSON.stringify({
-                    action: 'getChatAdministrators',
-                    params: { chat_id: chatId }
-                })
-            });
-            
-            if (!response.ok) return false;
-            
-            const data = await response.json();
-            if (data.ok && data.result) {
-                const admins = data.result;
-                const isBotAdmin = admins.some(admin => {
-                    const isBot = admin.user?.is_bot;
-                    const isThisBot = admin.user?.username === this.appConfig.BOT_USERNAME;
-                    return isBot && isThisBot;
-                });
-                return isBotAdmin;
-            }
-            return false;
-        } catch (error) {
-            return false;
         }
     }
 
@@ -2429,7 +2502,7 @@ showDepositModal() {
 
     renderTaskCard(task) {
         const isCompleted = this.userCompletedTasks.has(task.id);
-        const defaultIcon = 'https://i.ibb.co/GvWFRrnp/ninja.png';
+        const defaultIcon = this.settings.defaultTaskIcon;
         
         let buttonText = 'Start';
         let buttonClass = 'start';
@@ -2449,7 +2522,7 @@ showDepositModal() {
                          ondragstart="return false;">
                 </div>
                 <div class="referral-row-info">
-                    <p class="referral-row-username">${task.name}</p>
+                    <p class="referral-row-username">${this.escapeHtml(task.name)}</p>
                     <p class="task-reward-amount">Reward: ${(task.reward || this.settings.taskReward).toFixed(5)} TON</p>
                 </div>
                 <div class="referral-row-status">
@@ -2464,6 +2537,12 @@ showDepositModal() {
                 </div>
             </div>
         `;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     setupTaskButtons() {
@@ -2903,7 +2982,7 @@ showDepositModal() {
                     </div>
                     <div class="quest-reward-display">
                         <div class="reward-icon">
-                            <img src="https://cdn-icons-png.flaticon.com/512/15208/15208522.png" alt="TON" style="width: 28px; height: 28px; object-fit: contain;">
+                            <img src="${this.settings.tonIcon}" alt="TON" style="width: 28px; height: 28px; object-fit: contain;">
                         </div>
                         <div class="reward-amount">
                             <span class="reward-value">Reward: ${reward.toFixed(3)} TON</span>
@@ -3124,12 +3203,12 @@ showDepositModal() {
         return `
             <div class="referral-row">
                 <div class="referral-row-avatar">
-                    <img src="${referral.photoUrl}" alt="${referral.firstName}" 
+                    <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}" 
                          oncontextmenu="return false;" 
                          ondragstart="return false;">
                 </div>
                 <div class="referral-row-info">
-                    <p class="referral-row-username">${referral.username}</p>
+                    <p class="referral-row-username">${this.escapeHtml(referral.username)}</p>
                 </div>
                 <div class="referral-row-status ${referral.state}">
                     ${referral.state === 'verified' ? 'COMPLETED' : 'PENDING'}
