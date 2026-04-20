@@ -1064,8 +1064,7 @@ class CointoCashApp {
                         <i class="fas fa-gift"></i>
                     </div>
                     <h3>Welcome Tasks</h3>
-                    <p>Complete tasks to earn ${totalReward.toFixed(3)} TON bonus</p>
-                </div>
+                  </div>
                 
                 <div class="welcome-tasks-list">
                     ${tasksHtml}
@@ -1512,9 +1511,6 @@ class CointoCashApp {
                         <i class="far fa-copy"></i> Copy Memo
                     </button>
                 </div>
-                <div class="deposit-note" style="margin-top: 20px; padding: 12px; background: #222222; border-radius: 12px; font-size: 0.75rem; color: #9ca3af; text-align: center;">
-                    <i class="fas fa-info-circle"></i> Send TON to this address with the exact memo. Deposits are processed automatically.
-                </div>
             </div>
         `;
         
@@ -1794,8 +1790,7 @@ class CointoCashApp {
                                 <i class="fas fa-tag"></i> Task Name
                             </label>
                             <input type="text" id="task-name" class="form-input" placeholder="Enter your task name *" maxlength="15" required>
-                            <small style="color: #9da5b4; font-size: 11px;">Only English letters allowed</small>
-                        </div>
+                      </div>
                         
                         <div class="form-group">
                             <label class="form-label">
@@ -1909,9 +1904,8 @@ class CointoCashApp {
                             <img src="${this.settings.defaultTaskIcon}" alt="Task">
                         </div>
                         <div class="my-task-info">
-                            <div class="my-task-name">${task.name} ${verification}</div>
-                            <div class="my-task-category">Verification: ${task.verification || 'NO'}</div>
-                        </div>
+                            <div class="my-task-name">${task.name}</div>
+                    </div>
                         <div class="my-task-actions">
                             <button class="my-task-delete-btn" data-task-id="${task.id}" title="Delete task">
                                 <i class="fas fa-trash-alt"></i>
@@ -2108,13 +2102,10 @@ class CointoCashApp {
                 <div class="form-group">
                     <label class="form-label">Task: ${task.name}</label>
                     <label class="form-label">Progress: ${currentCompletions}/${maxCompletions}</label>
-                    <label class="form-label">Remaining completions: ${remaining}</label>
+                    <label class="form-label">Remaining: ${remaining}</label>
                 </div>
                 
-                <div class="price-info" style="background: rgba(231, 76, 60, 0.2);">
-                    <span class="price-label">Refund (50% of completed):</span>
-                    <span class="price-value" style="color: #e74c3c;">${refundAmount.toFixed(4)} TON</span>
-                </div>
+                
                 
                 <div class="task-message" id="delete-task-message" style="display: none;"></div>
                 
@@ -2155,13 +2146,6 @@ class CointoCashApp {
                 try {
                     if (this.db) {
                         await this.db.ref(`config/userTasks/${this.tgUser.id}/${task.id}`).remove();
-                        
-                        const newBalance = this.safeNumber(this.userState.balance) + refundAmount;
-                        await this.db.ref(`users/${this.tgUser.id}`).update({
-                            balance: newBalance
-                        });
-                        
-                        this.userState.balance = newBalance;
                     }
                     
                     await this.loadUserCreatedTasks();
@@ -2170,7 +2154,7 @@ class CointoCashApp {
                     
                     const messageDiv = document.getElementById('delete-task-message');
                     if (messageDiv) {
-                        messageDiv.textContent = `Task deleted! Refunded ${refundAmount.toFixed(4)} TON`;
+                        messageDiv.textContent = `Task deleted!`;
                         messageDiv.className = 'task-message success';
                         messageDiv.style.display = 'block';
                     }
