@@ -233,7 +233,7 @@ body {
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
     position: relative;
     overflow: hidden;
-    min-height: 100px;
+    min-height: 90px;
 }
 
 .profile-content {
@@ -247,14 +247,14 @@ body {
 .profile-left {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 15px;
     flex: 1;
     min-width: 0;
 }
 
 .user-avatar-container {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     flex-shrink: 0;
     position: relative;
 }
@@ -278,16 +278,14 @@ body {
 }
 
 .user-name {
-    font-size: 1.2rem;
-    font-weight: 800;
+    font-size: 1rem;
+    font-weight: 700;
     color: white;
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     line-height: 1.2;
-    letter-spacing: 0.3px;
 }
 
 .profile-right {
@@ -297,24 +295,24 @@ body {
 .balance-card {
     background: rgba(59, 130, 246, 0.15);
     backdrop-filter: blur(10px);
-    border-radius: 40px;
-    padding: 8px 16px;
+    border-radius: 30px;
+    padding: 6px 12px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .balance-icon {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
     pointer-events: none;
     -webkit-user-drag: none;
 }
 
 .balance-amount {
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: #3b82f6;
     font-family: monospace;
@@ -325,8 +323,8 @@ body {
     background: rgba(59, 130, 246, 0.2);
     border: 1px solid rgba(59, 130, 246, 0.4);
     border-radius: 50%;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -334,6 +332,7 @@ body {
     color: #3b82f6;
     transition: all 0.3s;
     margin-left: 4px;
+    font-size: 0.7rem;
 }
 
 .add-balance-btn:hover {
@@ -378,7 +377,6 @@ body {
     }
 }
 
-/* Welcome Tasks Modal */
 .welcome-tasks-modal {
     position: fixed;
     top: 0;
@@ -565,7 +563,6 @@ body {
     opacity: 0.7;
 }
 
-/* Tasks Tabs */
 .tasks-tabs {
     display: flex;
     background: #111111;
@@ -618,7 +615,6 @@ body {
     display: block;
 }
 
-/* Tasks Subtabs */
 .tasks-subtabs {
     display: flex;
     background: #111111;
@@ -637,7 +633,6 @@ body {
     display: block;
 }
 
-/* Task Category */
 .task-category {
     background: #111111;
     border-radius: 20px;
@@ -685,7 +680,6 @@ body {
     transform: translateY(-2px);
 }
 
-/* Promo Card */
 .promo-card {
     background: #111111;
     border-radius: 16px;
@@ -795,7 +789,6 @@ body {
     box-shadow: none;
 }
 
-/* Ad Cards */
 .ad-card {
     background: #111111;
     border-radius: 16px;
@@ -895,7 +888,6 @@ body {
     border: 2px solid #333333;
 }
 
-/* Task Cards */
 .referrals-list {
     display: flex;
     flex-direction: column;
@@ -1051,7 +1043,6 @@ body {
     margin: 0 0 15px 0;
 }
 
-/* Task Modal */
 .task-modal {
     position: fixed;
     top: 0;
@@ -1095,6 +1086,7 @@ body {
     cursor: pointer;
     color: #9ca3af;
     transition: all 0.3s;
+    z-index: 10;
 }
 
 .task-modal-close:hover {
@@ -1103,6 +1095,7 @@ body {
 }
 
 .task-modal-tabs-container {
+    margin-top: 20px;
     margin-bottom: 25px;
 }
 
@@ -1262,7 +1255,6 @@ body {
     color: #dc2626;
 }
 
-/* My Tasks */
 .my-tasks-list {
     display: flex;
     flex-direction: column;
@@ -1369,7 +1361,6 @@ body {
     font-weight: 600;
 }
 
-/* Deposit Modal */
 .deposit-modal {
     position: fixed;
     top: 0;
@@ -1409,11 +1400,19 @@ body {
     justify-content: center;
     cursor: pointer;
     color: #9ca3af;
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.deposit-modal-close:hover {
+    background: #333333;
+    color: white;
 }
 
 .deposit-modal-header {
     text-align: center;
     margin-bottom: 25px;
+    margin-top: 10px;
 }
 
 .deposit-modal-header h3 {
@@ -1464,7 +1463,6 @@ body {
     color: white;
 }
 
-/* Quests Page */
 .quests-container {
     display: flex;
     flex-direction: column;
@@ -1607,7 +1605,8 @@ body {
 .quest-reward-display {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 12px;
     background: #222222;
     padding: 15px;
     border-radius: 16px;
@@ -1615,8 +1614,14 @@ body {
 }
 
 .quest-reward-display .reward-icon {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
+}
+
+.quest-reward-display .reward-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .quest-card-footer {
@@ -1659,7 +1664,6 @@ body {
     border: 2px solid #333333;
 }
 
-/* Referrals Page */
 .referrals-container {
     display: flex;
     flex-direction: column;
@@ -1796,9 +1800,11 @@ body {
     margin-bottom: 20px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     padding-bottom: 15px;
     border-bottom: 2px solid #333333;
+    text-align: center;
 }
 
 .stats-grid-two {
@@ -1858,12 +1864,13 @@ body {
     margin-bottom: 20px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     padding-bottom: 15px;
     border-bottom: 2px solid #333333;
+    text-align: center;
 }
 
-/* Withdraw Page */
 .withdraw-container {
     display: flex;
     flex-direction: column;
@@ -2167,7 +2174,6 @@ body {
     margin: 0;
 }
 
-/* Bottom Navigation */
 .bottom-nav {
     position: fixed;
     bottom: 10px;
@@ -2247,7 +2253,6 @@ body {
     transform: translateY(-3px);
 }
 
-/* Error Container */
 .error-container {
     position: fixed;
     top: 0;
@@ -2358,7 +2363,6 @@ body {
     background: #333333;
 }
 
-/* Banned Container */
 .banned-container {
     position: fixed;
     top: 0;
@@ -2441,7 +2445,6 @@ body {
     line-height: 1.5;
 }
 
-/* Telegram Error */
 .telegram-error {
     position: fixed;
     top: 0;
@@ -2552,7 +2555,6 @@ body {
     background: #333333;
 }
 
-/* Responsive */
 @media (max-width: 480px) {
     .loading-card {
         padding: 30px 25px;
@@ -2569,33 +2571,29 @@ body {
     }
     
     .profile-card {
-        padding: 16px 18px;
-        min-height: 95px;
-    }
-    
-    .profile-content {
-        gap: 12px;
+        padding: 14px 16px;
+        min-height: 80px;
     }
     
     .profile-left {
-        gap: 15px;
+        gap: 12px;
     }
     
     .user-avatar-container {
-        width: 55px;
-        height: 55px;
+        width: 45px;
+        height: 45px;
     }
     
     .user-name {
-        font-size: 1.1rem;
+        font-size: 0.9rem;
     }
     
     .balance-card {
-        padding: 6px 12px;
+        padding: 5px 10px;
     }
     
     .balance-amount {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
     
     .tasks-tabs {
@@ -2659,25 +2657,25 @@ body {
     }
     
     .profile-card {
-        padding: 14px 16px;
-        min-height: 90px;
+        padding: 12px 14px;
+        min-height: 75px;
     }
     
     .user-avatar-container {
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
     }
     
     .user-name {
-        font-size: 1rem;
+        font-size: 0.85rem;
     }
     
     .balance-card {
-        padding: 5px 10px;
+        padding: 4px 8px;
     }
     
     .balance-amount {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
     }
     
     .tab-btn {
