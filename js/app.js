@@ -2497,7 +2497,7 @@ class CointoCashApp {
                 </div>
                 <div class="referral-row-info">
                     <p class="referral-row-username">${this.escapeHtml(task.name)}</p>
-                    <p class="task-reward-amount">Reward: ${(task.reward || this.settings.taskReward).toFixed(5)} TON</p>
+                    <p class="task-reward-amount">Reward: ${(task.reward || this.settings.taskReward).toFixed(3)} TON</p>
                 </div>
                 <div class="referral-row-status">
                     <button class="task-btn ${buttonClass}" 
