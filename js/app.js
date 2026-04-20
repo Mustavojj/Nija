@@ -568,17 +568,14 @@ class CointoCashApp {
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
-            referralCode: this.generateReferralCode(),
             totalEarned: 0,
             totalTasks: 0,
             totalWithdrawals: 0,
             completedTasks: [],
             referralEarnings: 0,
-            lastDailyCheckin: 0,
             status: 'free',
             lastUpdated: Date.now(),
             firebaseUid: this.auth?.currentUser?.uid || null,
-            welcomeTasksCompleted: false
         };
     }
 
@@ -608,8 +605,6 @@ class CointoCashApp {
                         joinedAt: Date.now(),
                         state: 'pending',
                         bonusGiven: false,
-                        bonusAmount: this.settings.referralBonus,
-                        verifiedAt: null
                     });
                 } else {
                     referralId = null;
@@ -623,26 +618,21 @@ class CointoCashApp {
             id: this.tgUser.id,
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             telegramId: this.tgUser.id,
-            firstName: this.getShortName(this.tgUser.first_name || '').substring(0, 10),
+            firstName: this.tgUser.first_name,
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
             referredBy: referralId,
-            referralCode: this.generateReferralCode(),
             totalEarned: 0,
             totalTasks: 0,
             totalWithdrawals: 0,
             referralEarnings: 0,
             completedTasks: [],
-            lastWithdrawalDate: null,
-            lastDailyCheckin: 0,
             createdAt: Date.now(),
             lastActive: Date.now(),
             status: 'free',
             referralState: referralId ? 'pending' : null,
             firebaseUid: this.auth?.currentUser?.uid || null,
-            welcomeTasksCompleted: false,
-            welcomeTasksCompletedAt: null
         };
         
         await userRef.set(userData);
