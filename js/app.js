@@ -141,164 +141,178 @@ class CointoCashApp {
         };
     }
 
+                
+            
+    
     async initialize() {
-        if (this.isInitializing || this.isInitialized) return;
+    if (this.isInitializing || this.isInitialized) return;
+    
+    this.isInitializing = true;
+    
+    try {
+        this.showLoadingProgressWithMessage(5, "Checking environment...");
         
-        this.isInitializing = true;
+        if (!window.Telegram || !window.Telegram.WebApp) {
+            this.showError("Please open from Telegram Mini App");
+            return;
+        }
+        
+        this.tg = window.Telegram.WebApp;
+        
+        if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
+            this.showError("User data not available");
+            return;
+        }
+        
+        this.tgUser = this.tg.initDataUnsafe.user;
+        
+        this.showLoadingProgressWithMessage(10, "Verifying account...");
+        const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
+        if (!multiAccountAllowed) {
+            this.isInitializing = false;
+            return;
+        }
+        
+        this.showLoadingProgressWithMessage(15, "Initializing Telegram...");
+        this.tg.ready();
+        this.tg.expand();
+        
+        this.showLoadingProgressWithMessage(20, "Setting up theme...");
+        this.setupTelegramTheme();
+        
+        this.notificationManager = new NotificationManager();
+        
+        this.showLoadingProgressWithMessage(25, "Connecting to database...");
+        
+        const firebaseSuccess = await this.initializeFirebase();
+        
+        if (firebaseSuccess) {
+            this.setupFirebaseAuth();
+        }
+        
+        this.showLoadingProgressWithMessage(35, "Loading settings...");
+        await this.loadSettingsFromFirebase();
+        
+        this.showLoadingProgressWithMessage(45, "Loading user data...");
+        await this.loadUserData();
+        
+        if (this.userState.status === 'ban') {
+            this.showBannedPage();
+            return;
+        }
+        
+        this.showLoadingProgressWithMessage(55, "Initializing managers...");
+        
+        this.adManager = new AdManager(this);
+        this.taskManager = new TaskManager(this);
+        this.questManager = new QuestManager(this);
+        this.referralManager = new ReferralManager(this);
+        
+        this.startReferralMonitor();
+        
+        this.showLoadingProgressWithMessage(60, "Loading tasks data...");
+        try {
+            await this.loadTasksData();
+        } catch (taskError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(70, "Loading withdrawal history...");
+        try {
+            await this.loadHistoryData();
+        } catch (historyError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(80, "Loading app statistics...");
+        try {
+            await this.loadAppStats();
+        } catch (statsError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(88, "Loading additional data...");
+        try {
+            await this.loadAdTimers();
+            await this.loadUserCreatedTasks();
+        } catch (adError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(95, "Rendering interface...");
+        this.renderUI();
+        
+        this.darkMode = true;
+        document.body.classList.add('dark-mode');
+        
+        this.isInitialized = true;
+        this.isInitializing = false;
+        
+        this.showLoadingProgressWithMessage(100, "Ready!");
+        
+        setTimeout(() => {
+            const appLoader = document.getElementById('app-loader');
+            const app = document.getElementById('app');
+            
+            if (appLoader) {
+                appLoader.style.opacity = '0';
+                appLoader.style.transition = 'opacity 0.5s ease';
+                
+                setTimeout(() => {
+                    appLoader.style.display = 'none';
+                }, 500);
+            }
+            
+            if (app) {
+                app.style.display = 'block';
+                setTimeout(() => {
+                    app.style.opacity = '1';
+                    app.style.transition = 'opacity 0.3s ease';
+                }, 50);
+            }
+            
+            this.showWelcomeTasksModal();
+            
+        }, 500);
+        
+    } catch (error) {
+        this.notificationManager?.showNotification(
+            "Initialization Error",
+            "Error at: " + (error.message || "Unknown"),
+            "error"
+        );
         
         try {
-            this.showLoadingProgress(5);
-            
-            if (!window.Telegram || !window.Telegram.WebApp) {
-                this.showError("Please open from Telegram Mini App");
-                return;
-            }
-            
-            this.tg = window.Telegram.WebApp;
-            
-            if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
-                this.showError("User data not available");
-                return;
-            }
-            
-            this.tgUser = this.tg.initDataUnsafe.user;
-            
-            this.showLoadingProgress(8);
-            const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
-            if (!multiAccountAllowed) {
-                this.isInitializing = false;
-                return;
-            }
-            
-            this.showLoadingProgress(12);
-            
-            this.tg.ready();
-            this.tg.expand();
-            
-            this.showLoadingProgress(15);
-            this.setupTelegramTheme();
-            
-            this.notificationManager = new NotificationManager();
-            
-            this.showLoadingProgress(20);
-            
-            const firebaseSuccess = await this.initializeFirebase();
-            
-            if (firebaseSuccess) {
-                this.setupFirebaseAuth();
-            }
-            
-            this.showLoadingProgress(40);
-            
-            await this.loadSettingsFromFirebase();
-            
-            await this.loadUserData();
-            
-            if (this.userState.status === 'ban') {
-                this.showBannedPage();
-                return;
-            }
-            
-            this.showLoadingProgress(50);
-            
-            this.adManager = new AdManager(this);
-            this.taskManager = new TaskManager(this);
-            this.questManager = new QuestManager(this);
-            this.referralManager = new ReferralManager(this);
-            
-            this.startReferralMonitor();
-            
-            this.showLoadingProgress(60);
-            
-            try {
-                await this.loadTasksData();
-            } catch (taskError) {
-            }
-            
-            this.showLoadingProgress(70);
-            
-            try {
-                await this.loadHistoryData();
-            } catch (historyError) {
-            }
-            
-            this.showLoadingProgress(80);
-            
-            try {
-                await this.loadAppStats();
-            } catch (statsError) {
-            }
-            
-            this.showLoadingProgress(85);
-            
-            try {
-                await this.loadAdTimers();
-                await this.loadUserCreatedTasks();
-            } catch (adError) {
-            }
-            
-            this.showLoadingProgress(90);
+            this.userState = this.getDefaultUserState();
             this.renderUI();
             
-            this.darkMode = true;
-            document.body.classList.add('dark-mode');
+            const appLoader = document.getElementById('app-loader');
+            const app = document.getElementById('app');
             
-            this.isInitialized = true;
-            this.isInitializing = false;
+            if (appLoader) appLoader.style.display = 'none';
+            if (app) app.style.display = 'block';
             
-            this.showLoadingProgress(100);
-            
-            setTimeout(() => {
-                const appLoader = document.getElementById('app-loader');
-                const app = document.getElementById('app');
-                
-                if (appLoader) {
-                    appLoader.style.opacity = '0';
-                    appLoader.style.transition = 'opacity 0.5s ease';
-                    
-                    setTimeout(() => {
-                        appLoader.style.display = 'none';
-                    }, 500);
-                }
-                
-                if (app) {
-                    app.style.display = 'block';
-                    setTimeout(() => {
-                        app.style.opacity = '1';
-                        app.style.transition = 'opacity 0.3s ease';
-                    }, 50);
-                }
-                
-                this.showWelcomeTasksModal();
-                
-            }, 500);
-            
-        } catch (error) {
-            if (this.notificationManager) {
-                this.notificationManager.showNotification(
-                    "Initialization Error",
-                    "App loaded with limited functionality. Please refresh.",
-                    "warning"
-                );
-            }
-            
-            try {
-                this.userState = this.getDefaultUserState();
-                this.renderUI();
-                
-                const appLoader = document.getElementById('app-loader');
-                const app = document.getElementById('app');
-                
-                if (appLoader) appLoader.style.display = 'none';
-                if (app) app.style.display = 'block';
-                
-            } catch (renderError) {
-                this.showError("Failed to initialize app: " + error.message);
-            }
-            
-            this.isInitializing = false;
+        } catch (renderError) {
+            this.showError("Failed to initialize app: " + error.message);
         }
+        
+        this.isInitializing = false;
     }
+}
+
+showLoadingProgressWithMessage(percent, message) {
+    const progressBar = document.getElementById('loading-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+        progressBar.style.transition = 'width 0.3s ease';
+    }
+    
+    const loadingPercentage = document.getElementById('loading-percentage');
+    if (loadingPercentage) {
+        loadingPercentage.textContent = `${percent}% - ${message}`;
+    }
+}
+    
 
     async loadWelcomeTasksFromFirebase() {
         try {
