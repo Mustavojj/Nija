@@ -2,7 +2,8 @@ const CORE_CONFIG = {
     CACHE_TTL: 300000,
     RATE_LIMITS: {
         'withdrawal': { limit: 1, window: 86400000 },
-        'ad_reward': { limit: 10, window: 300000 }
+        'ad_reward': { limit: 10, window: 300000 },
+        'claim_ref': { limit: 1, window: 5000 }
     },
     NOTIFICATION_COOLDOWN: 2000,
     MAX_NOTIFICATION_QUEUE: 3,
