@@ -153,7 +153,7 @@ class CointoCashApp {
     this.isInitializing = true;
     
     try {
-        this.showLoadingProgressWithMessage(5, "Checking environment...");
+        this.showLoadingProgressWithMessage(5, "Loading...");
         
         if (!window.Telegram || !window.Telegram.WebApp) {
             this.showError("Please open from Telegram Mini App");
@@ -169,23 +169,23 @@ class CointoCashApp {
         
         this.tgUser = this.tg.initDataUnsafe.user;
         
-        this.showLoadingProgressWithMessage(10, "Verifying account...");
+        this.showLoadingProgressWithMessage(10, "Loading...");
         const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
         if (!multiAccountAllowed) {
             this.isInitializing = false;
             return;
         }
         
-        this.showLoadingProgressWithMessage(15, "Initializing Telegram...");
+        this.showLoadingProgressWithMessage(15, "Loading...");
         this.tg.ready();
         this.tg.expand();
         
-        this.showLoadingProgressWithMessage(20, "Setting up theme...");
+        this.showLoadingProgressWithMessage(20, "Loading...");
         this.setupTelegramTheme();
         
         this.notificationManager = new NotificationManager();
         
-        this.showLoadingProgressWithMessage(25, "Connecting to database...");
+        this.showLoadingProgressWithMessage(25, "Loading...");
         
         const firebaseSuccess = await this.initializeFirebase();
         
@@ -193,10 +193,10 @@ class CointoCashApp {
             this.setupFirebaseAuth();
         }
         
-        this.showLoadingProgressWithMessage(35, "Loading settings...");
+        this.showLoadingProgressWithMessage(35, "Loading...");
         await this.loadSettingsFromFirebase();
         
-        this.showLoadingProgressWithMessage(45, "Loading user data...");
+        this.showLoadingProgressWithMessage(45, "Loading...");
         await this.loadUserData();
         
         if (this.userState.status === 'ban') {
@@ -204,7 +204,7 @@ class CointoCashApp {
             return;
         }
         
-        this.showLoadingProgressWithMessage(55, "Initializing managers...");
+        this.showLoadingProgressWithMessage(55, "Loading...");
         
         this.adManager = new AdManager(this);
         this.taskManager = new TaskManager(this);
@@ -213,28 +213,28 @@ class CointoCashApp {
         
         this.startReferralMonitor();
         
-        this.showLoadingProgressWithMessage(60, "Loading tasks data...");
+        this.showLoadingProgressWithMessage(60, "Loading...");
         try {
             await this.loadTasksData();
         } catch (taskError) {
             this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
         }
         
-        this.showLoadingProgressWithMessage(70, "Loading withdrawal history...");
+        this.showLoadingProgressWithMessage(70, "Loading...");
         try {
             await this.loadHistoryData();
         } catch (historyError) {
             this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
         }
         
-        this.showLoadingProgressWithMessage(80, "Loading app statistics...");
+        this.showLoadingProgressWithMessage(80, "Loading...");
         try {
             await this.loadAppStats();
         } catch (statsError) {
             this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
         }
         
-        this.showLoadingProgressWithMessage(88, "Loading additional data...");
+        this.showLoadingProgressWithMessage(88, "Loading...");
         try {
             await this.loadAdTimers();
             await this.loadUserCreatedTasks();
@@ -242,7 +242,7 @@ class CointoCashApp {
             this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
         }
         
-        this.showLoadingProgressWithMessage(95, "Rendering interface...");
+        this.showLoadingProgressWithMessage(95, "Loading...");
         this.renderUI();
         
         this.darkMode = true;
