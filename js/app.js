@@ -10,7 +10,6 @@ const DEFAULT_SETTINGS = {
         { name: "Official Channel", url: "https://t.me/CointoCash1", reward: 0.004 }, 
         { name: "Join Channel 1", url: "https://t.me/AksbCash", reward: 0.003 },
         { name: "Join Channel 2", url: "https://t.me/CashArab1", reward: 0.003 }
-
     ],
     defaultTaskIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
     defaultUserIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
@@ -51,10 +50,7 @@ class CointoCashApp {
         this.isInitializing = false;
         this.userWithdrawals = [];
         this.appStats = {
-            totalUsers: 0,
-            onlineUsers: 0,
-            totalPayments: 0,
-            totalWithdrawals: 0
+            totalUsers: 0
         };
         
         this.pages = [
@@ -106,6 +102,9 @@ class CointoCashApp {
         this.settings = { ...DEFAULT_SETTINGS };
         
         this.userCreatedTasks = [];
+        
+        this.referralEarnings = 0;
+        this.pendingRefEarnings = 0;
     }
 
     getRateLimiterClass() {
@@ -115,7 +114,8 @@ class CointoCashApp {
                 this.limits = {
                     'task_start': { limit: 1, window: 3000 },
                     'withdrawal': { limit: 1, window: 86400000 },
-                    'ad_reward': { limit: 10, window: 300000 }
+                    'ad_reward': { limit: 10, window: 300000 },
+                    'claim_ref': { limit: 1, window: 5000 }
                 };
             }
 
@@ -144,178 +144,226 @@ class CointoCashApp {
         };
     }
 
-                
-            
-    
     async initialize() {
-    if (this.isInitializing || this.isInitialized) return;
-    
-    this.isInitializing = true;
-    
-    try {
-        this.showLoadingProgressWithMessage(5, "Loading...");
+        if (this.isInitializing || this.isInitialized) return;
         
-        if (!window.Telegram || !window.Telegram.WebApp) {
-            this.showError("Please open from Telegram Mini App");
-            return;
-        }
+        this.isInitializing = true;
         
-        this.tg = window.Telegram.WebApp;
-        
-        if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
-            this.showError("User data not available");
-            return;
-        }
-        
-        this.tgUser = this.tg.initDataUnsafe.user;
-        
-        this.showLoadingProgressWithMessage(10, "Loading...");
-        const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
-        if (!multiAccountAllowed) {
-            this.isInitializing = false;
-            return;
-        }
-        
-        this.showLoadingProgressWithMessage(15, "Loading...");
-        this.tg.ready();
-        this.tg.expand();
-        
-        this.showLoadingProgressWithMessage(20, "Loading...");
-        this.setupTelegramTheme();
-        
-        this.notificationManager = new NotificationManager();
-        
-        this.showLoadingProgressWithMessage(25, "Loading...");
-        
-        const firebaseSuccess = await this.initializeFirebase();
-        
-        if (firebaseSuccess) {
-            this.setupFirebaseAuth();
-        }
-        
-        this.showLoadingProgressWithMessage(35, "Loading...");
-        await this.loadSettingsFromFirebase();
-        
-        this.showLoadingProgressWithMessage(45, "Loading...");
-        await this.loadUserData();
-        
-        if (this.userState.status === 'ban') {
-            this.showBannedPage();
-            return;
-        }
-        
-        this.showLoadingProgressWithMessage(55, "Loading...");
-        
-        this.adManager = new AdManager(this);
-        this.taskManager = new TaskManager(this);
-        this.questManager = new QuestManager(this);
-        this.referralManager = new ReferralManager(this);
-        
-        this.startReferralMonitor();
-        
-        this.showLoadingProgressWithMessage(60, "Loading...");
         try {
-            await this.loadTasksData();
-        } catch (taskError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(70, "Loading...");
-        try {
-            await this.loadHistoryData();
-        } catch (historyError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(80, "Loading...");
-        try {
-            await this.loadAppStats();
-        } catch (statsError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(88, "Loading...");
-        try {
-            await this.loadAdTimers();
-            await this.loadUserCreatedTasks();
-        } catch (adError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(95, "Loading...");
-        this.renderUI();
-        
-        this.darkMode = true;
-        document.body.classList.add('dark-mode');
-        
-        this.isInitialized = true;
-        this.isInitializing = false;
-        
-        this.showLoadingProgressWithMessage(100, "Ready!");
-        
-        setTimeout(() => {
-            const appLoader = document.getElementById('app-loader');
-            const app = document.getElementById('app');
+            this.showLoadingProgressWithMessage(5, "Loading...");
             
-            if (appLoader) {
-                appLoader.style.opacity = '0';
-                appLoader.style.transition = 'opacity 0.5s ease';
-                
-                setTimeout(() => {
-                    appLoader.style.display = 'none';
-                }, 500);
+            if (!window.Telegram || !window.Telegram.WebApp) {
+                this.showError("Please open from Telegram Mini App");
+                return;
             }
             
-            if (app) {
-                app.style.display = 'block';
-                setTimeout(() => {
-                    app.style.opacity = '1';
-                    app.style.transition = 'opacity 0.3s ease';
-                }, 50);
+            this.tg = window.Telegram.WebApp;
+            
+            if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
+                this.showError("User data not available");
+                return;
             }
             
-            this.showWelcomeTasksModal();
+            this.tgUser = this.tg.initDataUnsafe.user;
             
-        }, 500);
-        
-    } catch (error) {
-        this.notificationManager?.showNotification(
-            "Initialization Error",
-            "Error at: " + (error.message || "Unknown"),
-            "error"
-        );
-        
-        try {
-            this.userState = this.getDefaultUserState();
+            this.showLoadingProgressWithMessage(10, "Loading...");
+            const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
+            if (!multiAccountAllowed) {
+                this.isInitializing = false;
+                return;
+            }
+            
+            this.showLoadingProgressWithMessage(15, "Loading...");
+            this.tg.ready();
+            this.tg.expand();
+            
+            this.showLoadingProgressWithMessage(20, "Loading...");
+            this.setupTelegramTheme();
+            
+            this.notificationManager = new NotificationManager();
+            
+            this.showLoadingProgressWithMessage(25, "Loading...");
+            
+            const firebaseSuccess = await this.initializeFirebase();
+            
+            if (firebaseSuccess) {
+                this.setupFirebaseAuth();
+            }
+            
+            this.showLoadingProgressWithMessage(35, "Loading...");
+            await this.loadSettingsFromFirebase();
+            
+            this.showLoadingProgressWithMessage(45, "Loading...");
+            await this.loadUserData();
+            
+            if (this.userState.status === 'ban') {
+                this.showBannedPage();
+                return;
+            }
+            
+            this.showLoadingProgressWithMessage(55, "Loading...");
+            
+            this.adManager = new AdManager(this);
+            this.taskManager = new TaskManager(this);
+            this.questManager = new QuestManager(this);
+            this.referralManager = new ReferralManager(this);
+            
+            this.startReferralMonitor();
+            
+            this.showLoadingProgressWithMessage(60, "Loading...");
+            try {
+                await this.loadTasksData();
+            } catch (taskError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(70, "Loading...");
+            try {
+                await this.loadHistoryData();
+            } catch (historyError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(80, "Loading...");
+            try {
+                await this.loadAppStats();
+            } catch (statsError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(88, "Loading...");
+            try {
+                await this.loadAdTimers();
+                await this.loadUserCreatedTasks();
+                await this.loadReferralEarnings();
+            } catch (adError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(95, "Loading...");
             this.renderUI();
             
-            const appLoader = document.getElementById('app-loader');
-            const app = document.getElementById('app');
+            this.darkMode = true;
+            document.body.classList.add('dark-mode');
             
-            if (appLoader) appLoader.style.display = 'none';
-            if (app) app.style.display = 'block';
+            this.isInitialized = true;
+            this.isInitializing = false;
             
-        } catch (renderError) {
-            this.showError("Failed to initialize app: " + error.message);
+            this.showLoadingProgressWithMessage(100, "Ready!");
+            
+            setTimeout(() => {
+                const appLoader = document.getElementById('app-loader');
+                const app = document.getElementById('app');
+                
+                if (appLoader) {
+                    appLoader.style.opacity = '0';
+                    appLoader.style.transition = 'opacity 0.5s ease';
+                    
+                    setTimeout(() => {
+                        appLoader.style.display = 'none';
+                    }, 500);
+                }
+                
+                if (app) {
+                    app.style.display = 'block';
+                    setTimeout(() => {
+                        app.style.opacity = '1';
+                        app.style.transition = 'opacity 0.3s ease';
+                    }, 50);
+                }
+                
+                this.showWelcomeTasksModal();
+                
+            }, 500);
+            
+        } catch (error) {
+            this.notificationManager?.showNotification(
+                "Initialization Error",
+                "Error at: " + (error.message || "Unknown"),
+                "error"
+            );
+            
+            try {
+                this.userState = this.getDefaultUserState();
+                this.renderUI();
+                
+                const appLoader = document.getElementById('app-loader');
+                const app = document.getElementById('app');
+                
+                if (appLoader) appLoader.style.display = 'none';
+                if (app) app.style.display = 'block';
+                
+            } catch (renderError) {
+                this.showError("Failed to initialize app: " + error.message);
+            }
+            
+            this.isInitializing = false;
+        }
+    }
+
+    showLoadingProgressWithMessage(percent, message) {
+        const progressBar = document.getElementById('loading-progress-bar');
+        if (progressBar) {
+            progressBar.style.width = percent + '%';
+            progressBar.style.transition = 'width 0.3s ease';
         }
         
-        this.isInitializing = false;
+        const loadingPercentage = document.getElementById('loading-percentage');
+        if (loadingPercentage) {
+            loadingPercentage.textContent = `${percent}% - ${message}`;
+        }
     }
-}
 
-showLoadingProgressWithMessage(percent, message) {
-    const progressBar = document.getElementById('loading-progress-bar');
-    if (progressBar) {
-        progressBar.style.width = percent + '%';
-        progressBar.style.transition = 'width 0.3s ease';
+    async loadReferralEarnings() {
+        try {
+            if (!this.db || !this.tgUser) return;
+            const earningsRef = await this.db.ref(`users/${this.tgUser.id}/RefEarnings`).once('value');
+            this.referralEarnings = this.safeNumber(earningsRef.val() || 0);
+            this.pendingRefEarnings = this.referralEarnings;
+        } catch (error) {
+            this.referralEarnings = 0;
+            this.pendingRefEarnings = 0;
+        }
     }
-    
-    const loadingPercentage = document.getElementById('loading-percentage');
-    if (loadingPercentage) {
-        loadingPercentage.textContent = `${percent}% - ${message}`;
+
+    async claimReferralEarnings() {
+        if (this.referralEarnings <= 0.00001) {
+            this.notificationManager.showNotification("Claim", "No referral earnings to claim", "warning");
+            return;
+        }
+        
+        const rateLimitCheck = this.rateLimiter.checkLimit(this.tgUser.id, 'claim_ref');
+        if (!rateLimitCheck.allowed) {
+            this.notificationManager.showNotification("Rate Limit", `Please wait ${rateLimitCheck.remaining} seconds`, "warning");
+            return;
+        }
+        
+        this.rateLimiter.addRequest(this.tgUser.id, 'claim_ref');
+        
+        try {
+            const currentBalance = this.safeNumber(this.userState.balance);
+            const newBalance = currentBalance + this.referralEarnings;
+            
+            if (this.db) {
+                await this.db.ref(`users/${this.tgUser.id}`).update({
+                    balance: newBalance,
+                    RefEarnings: 0
+                });
+            }
+            
+            this.userState.balance = newBalance;
+            this.referralEarnings = 0;
+            this.pendingRefEarnings = 0;
+            
+            this.notificationManager.showNotification("Claimed", `${this.referralEarnings.toFixed(4)} TON added to balance`, "success");
+            
+            this.updateHeader();
+            this.renderReferralsPage();
+            
+        } catch (error) {
+            this.notificationManager.showNotification("Error", "Failed to claim earnings", "error");
+        }
     }
-}
-    
 
     async loadWelcomeTasksFromFirebase() {
         try {
@@ -495,16 +543,14 @@ showLoadingProgressWithMessage(percent, message) {
                 const userData = {
                     ...this.getDefaultUserState(),
                     firebaseUid: firebaseUid,
-                    telegramId: telegramId,
-                    createdAt: Date.now(),
-                    lastSynced: Date.now()
+                    createdAt: Date.now()
                 };
                 
                 await userRef.set(userData);
+                await this.updateAppStats('totalUsers', 1);
             } else {
                 await userRef.update({
-                    firebaseUid: firebaseUid,
-                    lastSynced: Date.now()
+                    firebaseUid: firebaseUid
                 });
             }
             
@@ -550,12 +596,12 @@ showLoadingProgressWithMessage(percent, message) {
                 userData = await this.updateExistingUser(userRef, userData);
             } else {
                 userData = await this.createNewUser(userRef);
+                await this.updateAppStats('totalUsers', 1);
             }
             
             if (userData.firebaseUid !== this.auth.currentUser.uid) {
                 await userRef.update({
-                    firebaseUid: this.auth.currentUser.uid,
-                    lastUpdated: Date.now()
+                    firebaseUid: this.auth.currentUser.uid
                 });
                 userData.firebaseUid = this.auth.currentUser.uid;
             }
@@ -578,9 +624,7 @@ showLoadingProgressWithMessage(percent, message) {
 
     getDefaultUserState() {
         return {
-            id: this.tgUser.id,
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-            telegramId: this.tgUser.id,
             firstName: this.getShortName(this.tgUser.first_name || 'User'),
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
@@ -590,9 +634,10 @@ showLoadingProgressWithMessage(percent, message) {
             totalWithdrawals: 0,
             completedTasks: [],
             referralEarnings: 0,
+            RefEarnings: 0,
             status: 'free',
-            lastUpdated: Date.now(),
             firebaseUid: this.auth?.currentUser?.uid || null,
+            welcomeTasksCompleted: false
         };
     }
 
@@ -615,13 +660,7 @@ showLoadingProgressWithMessage(percent, message) {
                     this.pendingReferralAfterWelcome = referralId;
                     
                     await this.db.ref(`referrals/${referralId}/${this.tgUser.id}`).set({
-                        userId: this.tgUser.id,
-                        username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-                        firstName: this.getShortName(this.tgUser.first_name || ''),
-                        photoUrl: this.settings.defaultUserIcon,
-                        joinedAt: Date.now(),
-                        state: 'pending',
-                        bonusGiven: false,
+                        joinedAt: Date.now()
                     });
                 } else {
                     referralId = null;
@@ -632,9 +671,7 @@ showLoadingProgressWithMessage(percent, message) {
         }
         
         const userData = {
-            id: this.tgUser.id,
             username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-            telegramId: this.tgUser.id,
             firstName: this.tgUser.first_name,
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
@@ -644,19 +681,16 @@ showLoadingProgressWithMessage(percent, message) {
             totalTasks: 0,
             totalWithdrawals: 0,
             referralEarnings: 0,
+            RefEarnings: 0,
             completedTasks: [],
             createdAt: Date.now(),
             lastActive: Date.now(),
             status: 'free',
-            referralState: referralId ? 'pending' : null,
             firebaseUid: this.auth?.currentUser?.uid || null,
+            welcomeTasksCompleted: false
         };
         
         await userRef.set(userData);
-        
-        try {
-            await this.updateAppStats('totalUsers', 1);
-        } catch (statsError) {}
         
         return userData;
     }
@@ -768,9 +802,7 @@ showLoadingProgressWithMessage(percent, message) {
 
     async updateExistingUser(userRef, userData) {
         await userRef.update({ 
-            lastActive: Date.now(),
-            username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-            firstName: (userData.firstName || this.getShortName(this.tgUser.first_name || 'User')).substring(0, 10)
+            lastActive: Date.now()
         });
         
         if (userData.completedTasks && Array.isArray(userData.completedTasks)) {
@@ -782,19 +814,16 @@ showLoadingProgressWithMessage(percent, message) {
         }
         
         const defaultData = {
-            referralCode: userData.referralCode || this.generateReferralCode(),
-            lastDailyCheckin: userData.lastDailyCheckin || 0,
             status: userData.status || 'free',
-            referralState: userData.referralState || 'verified',
             referralEarnings: userData.referralEarnings || 0,
+            RefEarnings: userData.RefEarnings || 0,
             totalEarned: userData.totalEarned || 0,
             totalTasks: userData.totalTasks || 0,
             totalWithdrawals: userData.totalWithdrawals || 0,
             balance: userData.balance || 0,
             referrals: userData.referrals || 0,
             firebaseUid: this.auth?.currentUser?.uid || userData.firebaseUid || null,
-            welcomeTasksCompleted: userData.welcomeTasksCompleted || false,
-            welcomeTasksCompletedAt: userData.welcomeTasksCompletedAt || null
+            welcomeTasksCompleted: userData.welcomeTasksCompleted || false
         };
         
         const updates = {};
@@ -832,60 +861,7 @@ showLoadingProgressWithMessage(percent, message) {
         return null;
     }
 
-    async processReferralRegistrationWithBonus(referrerId, newUserId) {
-        try {
-            if (!this.db) return;
-            
-            const referrerRef = this.db.ref(`users/${referrerId}`);
-            const referrerSnapshot = await referrerRef.once('value');
-            
-            if (!referrerSnapshot.exists()) return;
-            
-            const referrerData = referrerSnapshot.val();
-            
-            if (referrerData.status === 'ban') return;
-            
-            const referralBonus = this.settings.referralBonus;
-            
-            const newBalance = this.safeNumber(referrerData.balance) + referralBonus;
-            const newReferrals = (referrerData.referrals || 0) + 1;
-            const newReferralEarnings = this.safeNumber(referrerData.referralEarnings) + referralBonus;
-            const newTotalEarned = this.safeNumber(referrerData.totalEarned) + referralBonus;
-            
-            await referrerRef.update({
-                balance: newBalance,
-                referrals: newReferrals,
-                referralEarnings: newReferralEarnings,
-                totalEarned: newTotalEarned
-            });
-            
-            await this.db.ref(`referrals/${referrerId}/${newUserId}`).update({
-                state: 'verified',
-                bonusGiven: true,
-                verifiedAt: Date.now(),
-                bonusAmount: referralBonus
-            });
-            
-            await this.db.ref(`users/${newUserId}`).update({
-                referralState: 'verified'
-            });
-            
-            if (this.tgUser && referrerId === this.tgUser.id) {
-                this.userState.balance = newBalance;
-                this.userState.referrals = newReferrals;
-                this.userState.referralEarnings = newReferralEarnings;
-                this.userState.totalEarned = newTotalEarned;
-                
-                this.updateHeader();
-            }
-            
-            await this.refreshReferralsList();
-            
-        } catch (error) {
-        }
-    }
-
-    async processReferralTaskBonus(referrerId, taskReward) {
+    async addReferralEarning(referrerId, amount) {
         try {
             if (!this.db) return;
             if (!referrerId || referrerId === this.tgUser.id) return;
@@ -900,35 +876,51 @@ showLoadingProgressWithMessage(percent, message) {
             if (referrerData.status === 'ban') return;
             
             const referralPercentage = this.settings.referralPercentage;
-            const referralBonus = (taskReward * referralPercentage) / 100;
+            const referralBonus = (amount * referralPercentage) / 100;
             
             if (referralBonus <= 0) return;
             
-            const newBalance = this.safeNumber(referrerData.balance) + referralBonus;
-            const newReferralEarnings = this.safeNumber(referrerData.referralEarnings) + referralBonus;
-            const newTotalEarned = this.safeNumber(referrerData.totalEarned) + referralBonus;
+            const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
+            const newRefEarnings = currentRefEarnings + referralBonus;
             
             await referrerRef.update({
-                balance: newBalance,
-                referralEarnings: newReferralEarnings,
-                totalEarned: newTotalEarned
-            });
-            
-            await this.db.ref(`referralTasks/${referrerId}`).push({
-                userId: this.tgUser.id,
-                taskReward: taskReward,
-                referralBonus: referralBonus,
-                percentage: referralPercentage,
-                createdAt: Date.now()
+                RefEarnings: newRefEarnings
             });
             
             if (referrerId === this.tgUser.id) {
-                this.userState.balance = newBalance;
-                this.userState.referralEarnings = newReferralEarnings;
-                this.userState.totalEarned = newTotalEarned;
-                
+                this.referralEarnings = newRefEarnings;
+                this.pendingRefEarnings = newRefEarnings;
+            }
+            
+        } catch (error) {
+        }
+    }
+
+    async processReferralRegistration(referrerId, newUserId) {
+        try {
+            if (!this.db) return;
+            
+            const referrerRef = this.db.ref(`users/${referrerId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            
+            if (!referrerSnapshot.exists()) return;
+            
+            const referrerData = referrerSnapshot.val();
+            
+            if (referrerData.status === 'ban') return;
+            
+            const newReferrals = (referrerData.referrals || 0) + 1;
+            
+            await referrerRef.update({
+                referrals: newReferrals
+            });
+            
+            if (this.tgUser && referrerId === this.tgUser.id) {
+                this.userState.referrals = newReferrals;
                 this.updateHeader();
             }
+            
+            await this.refreshReferralsList();
             
         } catch (error) {
         }
@@ -977,10 +969,7 @@ showLoadingProgressWithMessage(percent, message) {
         try {
             if (!this.db) {
                 this.appStats = {
-                    totalUsers: 0,
-                    onlineUsers: 0,
-                    totalPayments: 0,
-                    totalWithdrawals: 0
+                    totalUsers: 0
                 };
                 return;
             }
@@ -988,33 +977,19 @@ showLoadingProgressWithMessage(percent, message) {
             const statsSnapshot = await this.db.ref('appStats').once('value');
             if (statsSnapshot.exists()) {
                 const stats = statsSnapshot.val();
-                const totalUsers = this.safeNumber(stats.totalUsers || 0);
-                const minOnline = Math.floor(totalUsers * 0.05);
-                const maxOnline = Math.floor(totalUsers * 0.20);
-                const onlineUsers = Math.floor(Math.random() * (maxOnline - minOnline + 1)) + minOnline;
-                
                 this.appStats = {
-                    totalUsers: totalUsers,
-                    onlineUsers: Math.max(onlineUsers, Math.floor(totalUsers * 0.05)),
-                    totalPayments: this.safeNumber(stats.totalPayments || 0),
-                    totalWithdrawals: this.safeNumber(stats.totalWithdrawals || 0)
+                    totalUsers: this.safeNumber(stats.totalUsers || 0)
                 };
             } else {
                 this.appStats = {
-                    totalUsers: 0,
-                    onlineUsers: 0,
-                    totalPayments: 0,
-                    totalWithdrawals: 0
+                    totalUsers: 0
                 };
                 await this.db.ref('appStats').set(this.appStats);
             }
             
         } catch (error) {
             this.appStats = {
-                totalUsers: 0,
-                onlineUsers: 0,
-                totalPayments: 0,
-                totalWithdrawals: 0
+                totalUsers: 0
             };
         }
     }
@@ -1023,21 +998,8 @@ showLoadingProgressWithMessage(percent, message) {
         try {
             if (!this.db) return;
             
-            if (stat === 'totalUsers') {
-                const newTotal = (this.appStats.totalUsers || 0) + value;
-                const minOnline = Math.floor(newTotal * 0.05);
-                const maxOnline = Math.floor(newTotal * 0.20);
-                const onlineUsers = Math.floor(Math.random() * (maxOnline - minOnline + 1)) + minOnline;
-                
-                await this.db.ref('appStats/onlineUsers').set(Math.max(onlineUsers, Math.floor(newTotal * 0.05)));
-            }
-            
             await this.db.ref(`appStats/${stat}`).transaction(current => (current || 0) + value);
             this.appStats[stat] = (this.appStats[stat] || 0) + value;
-            
-            if (stat === 'totalUsers') {
-                await this.loadAppStats();
-            }
         } catch (error) {}
     }
 
@@ -1319,21 +1281,17 @@ showLoadingProgressWithMessage(percent, message) {
                     balance: newBalance,
                     totalEarned: this.safeNumber(this.userState.totalEarned) + totalReward,
                     totalTasks: this.safeNumber(this.userState.totalTasks),
-                    welcomeTasksCompleted: true,
-                    welcomeTasksCompletedAt: Date.now(),
-                    welcomeTasksVerifiedAt: Date.now()
+                    welcomeTasksCompleted: true
                 });
             }
             
             this.userState.balance = newBalance;
             this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + totalReward;
             this.userState.welcomeTasksCompleted = true;
-            this.userState.welcomeTasksCompletedAt = Date.now();
-            this.userState.welcomeTasksVerifiedAt = Date.now();
             
             if (this.pendingReferralAfterWelcome) {
                 const referrerId = this.pendingReferralAfterWelcome;
-                await this.processReferralRegistrationWithBonus(referrerId, this.tgUser.id);
+                await this.processReferralRegistration(referrerId, this.tgUser.id);
                 this.pendingReferralAfterWelcome = null;
             }
             
@@ -1367,24 +1325,23 @@ showLoadingProgressWithMessage(percent, message) {
             let updated = false;
             
             for (const referralId in referrals) {
-                const referral = referrals[referralId];
-                
-                if (referral.state === 'pending') {
-                    const newUserRef = await this.db.ref(`users/${referralId}`).once('value');
-                    if (newUserRef.exists()) {
-                        const newUserData = newUserRef.val();
-                        
-                        if (newUserData.welcomeTasksCompleted) {
-                            await this.processReferralRegistrationWithBonus(this.tgUser.id, referralId);
-                            updated = true;
-                        }
+                const newUserRef = await this.db.ref(`users/${referralId}`).once('value');
+                if (newUserRef.exists()) {
+                    const newUserData = newUserRef.val();
+                    
+                    if (newUserData.welcomeTasksCompleted && !referrals[referralId].bonusGiven) {
+                        await this.processReferralRegistration(this.tgUser.id, referralId);
+                        await this.db.ref(`referrals/${this.tgUser.id}/${referralId}`).update({
+                            bonusGiven: true,
+                            verifiedAt: Date.now()
+                        });
+                        updated = true;
                     }
                 }
             }
             
             if (updated) {
                 this.cache.delete(`user_${this.tgUser.id}`);
-                this.cache.delete(`referrals_${this.tgUser.id}`);
                 
                 if (document.getElementById('referrals-page')?.classList.contains('active')) {
                     this.renderReferralsPage();
@@ -1576,13 +1533,13 @@ showLoadingProgressWithMessage(percent, message) {
         const addBalanceBtn = document.getElementById('add-balance-btn');
         
         if (userPhoto) {
-            userPhoto.src = this.userState.photoUrl || this.settings.defaultUserIcon;
+            userPhoto.src = this.tgUser?.photo_url || this.settings.defaultUserIcon;
             userPhoto.oncontextmenu = (e) => e.preventDefault();
             userPhoto.ondragstart = () => false;
         }
         
         if (userName) {
-            const fullName = this.tgUser.first_name || 'User';
+            const fullName = this.tgUser?.first_name || 'User';
             userName.textContent = this.truncateName(fullName, 15);
         }
         
@@ -2101,12 +2058,6 @@ showLoadingProgressWithMessage(percent, message) {
     }
 
     async showDeleteTaskConfirmation(task) {
-        const currentCompletions = task.currentCompletions || 0;
-        const maxCompletions = task.maxCompletions || 100;
-        const remaining = maxCompletions - currentCompletions;
-        const taskPricePer100 = this.settings.taskPrice100;
-        const refundAmount = (currentCompletions / 100) * taskPricePer100 * 0.5;
-        
         const modal = document.createElement('div');
         modal.className = 'task-modal';
         modal.innerHTML = `
@@ -2118,11 +2069,8 @@ showLoadingProgressWithMessage(percent, message) {
                 
                 <div class="form-group">
                     <label class="form-label">Task: ${task.name}</label>
-                    <label class="form-label">Progress: ${currentCompletions}/${maxCompletions}</label>
-                    <label class="form-label">Remaining: ${remaining}</label>
+                    <label class="form-label">Progress: ${task.currentCompletions || 0}/${task.maxCompletions || 100}</label>
                 </div>
-                
-                
                 
                 <div class="task-message" id="delete-task-message" style="display: none;"></div>
                 
@@ -3090,7 +3038,7 @@ showLoadingProgressWithMessage(percent, message) {
             
             for (const referralId in referrals) {
                 const referral = referrals[referralId];
-                if (referral.state === 'verified' && referral.bonusGiven) {
+                if (referral.bonusGiven) {
                     verifiedReferrals.push({
                         id: referralId,
                         ...referral
@@ -3114,7 +3062,8 @@ showLoadingProgressWithMessage(percent, message) {
         
         const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
-        const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
+        const referralEarnings = this.safeNumber(this.referralEarnings || 0);
+        const canClaim = referralEarnings > 0.00001;
         
         const recentReferrals = this.loadRecentReferralsForDisplay();
         
@@ -3135,24 +3084,12 @@ showLoadingProgressWithMessage(percent, message) {
                                 <i class="fas fa-gift"></i>
                             </div>
                             <div class="info-content">
-                                <h4>Get ${this.settings.referralBonus.toFixed(3)} TON</h4>
-                                <p>For each verified referral</p>
-                            </div>
-                        </div>
-                        <div class="info-card">
-                            <div class="info-icon">
-                                <i class="fas fa-percentage"></i>
-                            </div>
-                            <div class="info-content">
-                                <h4>Earn ${this.settings.referralPercentage}% Bonus</h4>
-                                <p>From your referrals' earnings</p>
+                                <h4>Earn ${this.settings.referralPercentage}% Commission</h4>
+                                <p>${this.settings.referralPercentage}% of your friends earnings</p>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="referral-stats-section">
-                    <h3><i class="fas fa-chart-bar"></i> Referrals Statistics</h3>
+                    
                     <div class="stats-grid-two">
                         <div class="stat-card">
                             <div class="stat-icon">
@@ -3169,9 +3106,19 @@ showLoadingProgressWithMessage(percent, message) {
                             </div>
                             <div class="stat-info">
                                 <h4>Total Earnings</h4>
-                                <p class="stat-value">${referralEarnings.toFixed(3)} TON</p>
+                                <p class="stat-value">${referralEarnings.toFixed(4)} TON</p>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div class="pending-profits-card" style="background: #222222; border-radius: 16px; padding: 16px; margin-top: 15px;">
+                        <div class="pending-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span style="font-weight: 700;"><i class="fas fa-clock"></i> Referral Earnings</span>
+                            <span class="pending-amount" style="font-weight: 800; color: #3b82f6;">${referralEarnings.toFixed(6)} TON</span>
+                        </div>
+                        <button class="claim-profits-btn ${canClaim ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${!canClaim ? 'disabled' : ''} style="width:100%; padding:14px; background:${canClaim ? '#3b82f6' : '#333333'}; border:none; border-radius:14px; color:white; font-weight:800; cursor:${canClaim ? 'pointer' : 'not-allowed'};">
+                            <i class="fas fa-arrow-down"></i> CLAIM
+                        </button>
                     </div>
                 </div>
                 
@@ -3188,21 +3135,26 @@ showLoadingProgressWithMessage(percent, message) {
         `;
         
         this.setupReferralsPageEvents();
+        
+        const claimBtn = document.getElementById('claim-ref-earnings-btn');
+        if (claimBtn && canClaim) {
+            claimBtn.addEventListener('click', () => this.claimReferralEarnings());
+        }
     }
 
     renderReferralRow(referral) {
         return `
             <div class="referral-row">
                 <div class="referral-row-avatar">
-                    <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}" 
+                    <img src="${this.settings.defaultUserIcon}" alt="User" 
                          oncontextmenu="return false;" 
                          ondragstart="return false;">
                 </div>
                 <div class="referral-row-info">
-                    <p class="referral-row-username">${this.escapeHtml(referral.username)}</p>
+                    <p class="referral-row-username">User ${referral.id.substring(0, 8)}</p>
                 </div>
-                <div class="referral-row-status ${referral.state}">
-                    ${referral.state === 'verified' ? 'COMPLETED' : 'PENDING'}
+                <div class="referral-row-status verified">
+                    COMPLETED
                 </div>
             </div>
         `;
@@ -3503,15 +3455,6 @@ showLoadingProgressWithMessage(percent, message) {
                 }
             });
         }
-    }
-
-    generateReferralCode() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = '';
-        for (let i = 0; i < 7; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return `COIN${code}`;
     }
 
     safeNumber(value) {
