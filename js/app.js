@@ -7,7 +7,10 @@ const DEFAULT_SETTINGS = {
     taskPrice100: 0.10,
     adRewardTon: 0.001,
     welcomeTasks: [
-        { name: "Join our channel", url: "https://t.me/AksbCash", reward: 0.005 }
+        { name: "Official Channel", url: "https://t.me/CointoCash1", reward: 0.004 }, 
+        { name: "Join Channel 1", url: "https://t.me/AksbCash", reward: 0.003 },
+        { name: "Join Channel 2", url: "https://t.me/CashArab1", reward: 0.003 }
+
     ],
     defaultTaskIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
     defaultUserIcon: "https://i.ibb.co/Kj9Spc3R/file-0000000030c47246abd539cab2933811.png",
