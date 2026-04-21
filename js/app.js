@@ -3113,8 +3113,8 @@ class CointoCashApp {
                     
                     <div class="pending-profits-card" style="background: #222222; border-radius: 16px; padding: 16px; margin-top: 15px;">
                         <div class="pending-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <span style="font-weight: 700;"><i class="fas fa-clock"></i> Referral Earnings</span>
-                            <span class="pending-amount" style="font-weight: 800; color: #3b82f6;">${referralEarnings.toFixed(6)} TON</span>
+                            <span style="font-weight: 700;"><i class="fas fa-coins"></i> Earnings</span>
+                            <span class="pending-amount" style="font-weight: 800; color: #3b82f6;">${referralEarnings.toFixed(3)} TON</span>
                         </div>
                         <button class="claim-profits-btn ${canClaim ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${!canClaim ? 'disabled' : ''} style="width:100%; padding:14px; background:${canClaim ? '#3b82f6' : '#333333'}; border:none; border-radius:14px; color:white; font-weight:800; cursor:${canClaim ? 'pointer' : 'not-allowed'};">
                             <i class="fas fa-arrow-down"></i> CLAIM
