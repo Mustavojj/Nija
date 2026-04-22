@@ -661,7 +661,7 @@ class CointoCashApp {
             }
         }
         
-        if (referralId && referralId > 0 && referralId !== this.tgUser.id) {
+        if (referralId !== this.tgUser.id) {
             const referrerRef = this.db.ref(`users/${referralId}`);
             const referrerSnapshot = await referrerRef.once('value');
             
