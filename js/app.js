@@ -651,68 +651,99 @@ class CointoCashApp {
         };
     }
 
+    /**
+     * استخراج معرف المحيل من start_param
+     * هذه هي الوظيفة الرئيسية المسؤولة عن جلب معرف المحيل بشكل صحيح
+     */
     extractReferralId() {
-        let startParam = null;
-        
         try {
+            // محاولة الحصول على start_param من عدة مصادر
+            let startParam = null;
+            
+            // المصدر 1: من initDataUnsafe
             if (this.tg?.initDataUnsafe?.start_param) {
                 startParam = this.tg.initDataUnsafe.start_param;
+                console.log('[REFERRAL] start_param from initDataUnsafe:', startParam);
             }
             
+            // المصدر 2: من initData
             if (!startParam && this.tg?.initData) {
                 const params = new URLSearchParams(this.tg.initData);
                 startParam = params.get('start_param');
+                console.log('[REFERRAL] start_param from initData:', startParam);
             }
             
+            // المصدر 3: من رابط الصفحة
             if (!startParam && window.location.href.includes('startapp=')) {
                 const match = window.location.href.match(/startapp=(\d+)/);
-                if (match) startParam = match[1];
-            }
-            
-            let referralId = null;
-            
-            if (startParam) {
-                if (startParam.includes('startapp=')) {
-                    const match = startParam.match(/startapp=(\d+)/);
-                    if (match) referralId = parseInt(match[1]);
-                } else if (/^\d+$/.test(startParam)) {
-                    referralId = parseInt(startParam);
+                if (match) {
+                    startParam = match[1];
+                    console.log('[REFERRAL] start_param from URL:', startParam);
                 }
             }
             
-            if (referralId && referralId !== this.tgUser?.id) {
-                this.notificationManager?.showNotification(
-                    "Referral Detected",
-                    `You were referred by ID: ${referralId}`,
-                    "success"
-                );
-            } else if (startParam && !referralId) {
-                this.notificationManager?.showNotification(
-                    "Invalid Referral",
-                    `Referral ID not valid: ${startParam}`,
-                    "warning"
-                );
+            // استخراج الرقم من start_param
+            let referralId = null;
+            
+            if (startParam) {
+                // إذا كان start_param يحتوي على startapp=
+                if (startParam.includes('startapp=')) {
+                    const match = startParam.match(/startapp=(\d+)/);
+                    if (match) {
+                        referralId = parseInt(match[1]);
+                        console.log('[REFERRAL] Extracted referralId from startapp=', referralId);
+                    }
+                }
+                // إذا كان الرقم مباشرة
+                else if (/^\d+$/.test(startParam)) {
+                    referralId = parseInt(startParam);
+                    console.log('[REFERRAL] Extracted referralId as number:', referralId);
+                }
+                // إذا كان هناك تنسيق آخر مثل "ref123456"
+                else if (startParam.includes('ref')) {
+                    const match = startParam.match(/ref(\d+)/);
+                    if (match) {
+                        referralId = parseInt(match[1]);
+                        console.log('[REFERRAL] Extracted referralId from ref pattern:', referralId);
+                    }
+                }
             }
             
-            return referralId;
+            // التحقق من صحة معرف المحيل (يجب ألا يكون نفس معرف المستخدم الحالي)
+            if (referralId && referralId !== this.tgUser?.id) {
+                console.log('[REFERRAL] Valid referral detected:', referralId);
+                return referralId;
+            } else if (referralId && referralId === this.tgUser?.id) {
+                console.log('[REFERRAL] User cannot refer themselves, ignoring');
+                return null;
+            }
+            
+            console.log('[REFERRAL] No valid referral found');
+            return null;
             
         } catch (error) {
-            this.notificationManager?.showNotification("Error", "Failed to extract referral: " + error.message, "error");
+            console.error('[REFERRAL] Error extracting referral ID:', error);
             return null;
         }
     }
 
+    /**
+     * إضافة صديق (محال) إلى قاعدة بيانات المحيل
+     */
     async addFriend(referrerId, newUserId) {
         try {
             if (!this.db) return false;
             
+            // التحقق من وجود العلاقة مسبقاً
             const existingRef = await this.db.ref(`friends/${referrerId}/${newUserId}`).once('value');
             if (existingRef.exists()) {
+                console.log('[REFERRAL] Friend relationship already exists');
                 return true;
             }
             
             const currentTime = Date.now();
             
+            // إضافة الصديق إلى قائمة المحيل
             await this.db.ref(`friends/${referrerId}/${newUserId}`).set({
                 userId: newUserId,
                 username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
@@ -722,6 +753,7 @@ class CointoCashApp {
                 bonusGiven: false
             });
             
+            // تحديث عدد الإحالات للمحيل
             const referrerRef = this.db.ref(`users/${referrerId}`);
             const referrerSnapshot = await referrerRef.once('value');
             if (referrerSnapshot.exists()) {
@@ -729,46 +761,63 @@ class CointoCashApp {
                 await referrerRef.update({
                     referrals: currentFriends + 1
                 });
+                console.log('[REFERRAL] Updated referrer referrals count to:', currentFriends + 1);
             }
             
-            this.notificationManager?.showNotification(
-                "Referral Saved",
-                `You have been successfully referred by ID: ${referrerId}`,
-                "success"
-            );
-            
+            console.log('[REFERRAL] Friend added successfully:', { referrerId, newUserId });
             return true;
             
         } catch (error) {
-            this.notificationManager?.showNotification(
-                "Referral Error",
-                "Failed to save referral: " + error.message,
-                "error"
-            );
+            console.error('[REFERRAL] Error adding friend:', error);
             return false;
         }
     }
 
+    /**
+     * إنشاء مستخدم جديد مع معالجة الإحالة
+     */
     async createNewUser(userRef) {
         let referralId = null;
         
         try {
+            // استخراج معرف المحيل
             referralId = this.extractReferralId();
+            console.log('[REFERRAL] Creating new user, referralId:', referralId);
             
+            // منع المستخدم من إحالة نفسه
             if (referralId && referralId === this.tgUser.id) {
+                console.log('[REFERRAL] User cannot refer themselves');
                 referralId = null;
             }
             
+            // التحقق من صحة معرف المحيل في قاعدة البيانات
             if (referralId && referralId > 0) {
                 const referrerRef = this.db.ref(`users/${referralId}`);
                 const referrerSnapshot = await referrerRef.once('value');
                 
                 if (referrerSnapshot.exists()) {
-                    const saved = await this.addFriend(referralId, this.tgUser.id);
-                    if (saved) {
-                        this.pendingReferralAfterWelcome = referralId;
+                    // التحقق من أن المحيل ليس محظوراً
+                    const referrerData = referrerSnapshot.val();
+                    if (referrerData.status !== 'ban') {
+                        // حفظ العلاقة
+                        const saved = await this.addFriend(referralId, this.tgUser.id);
+                        if (saved) {
+                            // تخزين معرف المحيل ليتم استخدامه لاحقاً بعد إكمال المهام الترحيبية
+                            this.pendingReferralAfterWelcome = referralId;
+                            console.log('[REFERRAL] Referral saved, pending bonus after welcome tasks:', referralId);
+                            
+                            this.notificationManager?.showNotification(
+                                "Referral Detected",
+                                `You were referred by user ${referralId}`,
+                                "success"
+                            );
+                        }
+                    } else {
+                        console.log('[REFERRAL] Referrer is banned, ignoring');
+                        referralId = null;
                     }
                 } else {
+                    console.log('[REFERRAL] Referrer ID does not exist in database:', referralId);
                     referralId = null;
                     this.notificationManager?.showNotification(
                         "Referral Failed",
@@ -779,20 +828,17 @@ class CointoCashApp {
             }
             
         } catch (error) {
-            this.notificationManager?.showNotification(
-                "Referral Error",
-                "Failed to process referral during registration: " + error.message,
-                "error"
-            );
+            console.error('[REFERRAL] Error processing referral during registration:', error);
             referralId = null;
         }
         
+        // إنشاء بيانات المستخدم الجديد
         const userData = {
             firstName: this.tgUser.first_name,
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
-            referredBy: referralId,
+            referredBy: referralId,  // حفظ معرف المحيل
             totalEarned: 0,
             totalWithdrawals: 0,
             referralEarnings: 0,
@@ -805,11 +851,72 @@ class CointoCashApp {
             welcomeTasksCompleted: false
         };
         
+        console.log('[REFERRAL] Creating user with data:', { 
+            userId: this.tgUser.id, 
+            referredBy: referralId 
+        });
+        
         await userRef.set(userData);
         
         await this.updateAppStats('totalUsers', 1);
         
         return userData;
+    }
+
+    /**
+     * معالجة مكافأة التسجيل للمحيل بعد إكمال المستخدم الجديد للمهام الترحيبية
+     */
+    async processReferralRegistrationBonus(referrerId, newUserId) {
+        try {
+            if (!this.db) return;
+            console.log('[REFERRAL] Processing registration bonus for referrer:', referrerId, 'new user:', newUserId);
+            
+            const referrerRef = this.db.ref(`users/${referrerId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            
+            if (!referrerSnapshot.exists()) {
+                console.log('[REFERRAL] Referrer not found:', referrerId);
+                return;
+            }
+            
+            const referrerData = referrerSnapshot.val();
+            
+            if (referrerData.status === 'ban') {
+                console.log('[REFERRAL] Referrer is banned, skipping bonus');
+                return;
+            }
+            
+            const referralBonus = this.settings.referralBonus;
+            console.log('[REFERRAL] Registration bonus amount:', referralBonus);
+            
+            const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
+            const newRefEarnings = currentRefEarnings + referralBonus;
+            
+            await referrerRef.update({
+                RefEarnings: newRefEarnings
+            });
+            
+            // تحديث حالة المكافأة في علاقة الصديق
+            await this.db.ref(`friends/${referrerId}/${newUserId}`).update({
+                bonusGiven: true,
+                verifiedAt: Date.now(),
+                bonusAmount: referralBonus
+            });
+            
+            console.log('[REFERRAL] Registration bonus given:', { referrerId, newUserId, bonus: referralBonus });
+            
+            // تحديث الواجهة إذا كان المستخدم الحالي هو المحيل
+            if (referrerId === this.tgUser.id) {
+                this.pendingRefEarnings = newRefEarnings;
+                this.userState.RefEarnings = newRefEarnings;
+                
+                this.updateHeader();
+                this.renderReferralsPage();
+            }
+            
+        } catch (error) {
+            console.error('[REFERRAL] Error processing registration bonus:', error);
+        }
     }
 
     async loadReferralData() {
@@ -838,7 +945,13 @@ class CointoCashApp {
             this.userState.referrals = this.friendsList.length;
             this.userState.RefEarnings = this.pendingRefEarnings;
             
+            console.log('[REFERRAL] Loaded referral data:', {
+                referralsCount: this.friendsList.length,
+                pendingEarnings: this.pendingRefEarnings
+            });
+            
         } catch (error) {
+            console.error('[REFERRAL] Error loading referral data:', error);
             this.pendingRefEarnings = 0;
             this.totalRefEarnings = 0;
             this.friendsList = [];
@@ -915,46 +1028,6 @@ class CointoCashApp {
             if (referrerId === this.tgUser.id) {
                 this.pendingRefEarnings = newRefEarnings;
                 this.userState.RefEarnings = newRefEarnings;
-                this.renderReferralsPage();
-            }
-            
-        } catch (error) {
-        }
-    }
-
-    async processReferralRegistrationBonus(referrerId, newUserId) {
-        try {
-            if (!this.db) return;
-            
-            const referrerRef = this.db.ref(`users/${referrerId}`);
-            const referrerSnapshot = await referrerRef.once('value');
-            
-            if (!referrerSnapshot.exists()) return;
-            
-            const referrerData = referrerSnapshot.val();
-            
-            if (referrerData.status === 'ban') return;
-            
-            const referralBonus = this.settings.referralBonus;
-            
-            const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
-            const newRefEarnings = currentRefEarnings + referralBonus;
-            
-            await referrerRef.update({
-                RefEarnings: newRefEarnings
-            });
-            
-            await this.db.ref(`friends/${referrerId}/${newUserId}`).update({
-                bonusGiven: true,
-                verifiedAt: Date.now(),
-                bonusAmount: referralBonus
-            });
-            
-            if (referrerId === this.tgUser.id) {
-                this.pendingRefEarnings = newRefEarnings;
-                this.userState.RefEarnings = newRefEarnings;
-                
-                this.updateHeader();
                 this.renderReferralsPage();
             }
             
@@ -1315,6 +1388,9 @@ class CointoCashApp {
         }
     }
     
+    /**
+     * إكمال المهام الترحيبية ومعالجة مكافأة الإحالة
+     */
     async completeWelcomeTasks() {
         try {
             const totalReward = this.welcomeTasksList.reduce((sum, task) => sum + (task.reward || 0.005), 0);
@@ -1333,8 +1409,19 @@ class CointoCashApp {
             this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + totalReward;
             this.userState.welcomeTasksCompleted = true;
             
-            if (this.userState.referredBy) {
-                await this.processReferralRegistrationBonus(this.userState.referredBy, this.tgUser.id);
+            // معالجة مكافأة الإحالة بعد إكمال المهام الترحيبية
+            console.log('[REFERRAL] Welcome tasks completed, checking for pending referral');
+            console.log('[REFERRAL] pendingReferralAfterWelcome:', this.pendingReferralAfterWelcome);
+            console.log('[REFERRAL] userState.referredBy:', this.userState.referredBy);
+            
+            // استخدام pendingReferralAfterWelcome أو userState.referredBy
+            const referrerId = this.pendingReferralAfterWelcome || this.userState.referredBy;
+            
+            if (referrerId) {
+                console.log('[REFERRAL] Processing registration bonus for referrer:', referrerId);
+                await this.processReferralRegistrationBonus(referrerId, this.tgUser.id);
+            } else {
+                console.log('[REFERRAL] No referrer found for registration bonus');
             }
             
             this.cache.delete(`user_${this.tgUser.id}`);
@@ -1342,6 +1429,7 @@ class CointoCashApp {
             
             return true;
         } catch (error) {
+            console.error('[REFERRAL] Error completing welcome tasks:', error);
             return false;
         }
     }
