@@ -601,11 +601,9 @@ class CointoCashApp {
             
             let userData;
             
-            if (userSnapshot.exists()) {
-                userData = userSnapshot.val();
-                userData = await this.updateExistingUser(userRef, userData);
-            } else {
+            if (!userSnapshot.exists()) {
                 userData = await this.createNewUser(userRef);
+                await this.registerReferral(this.tgUser.id);
             }
             
             if (userData.firebaseUid !== this.auth.currentUser.uid) {
@@ -727,63 +725,53 @@ class CointoCashApp {
         }
     }
 
-    async createNewUser(userRef) {
-        let referralId = null;
+    
+async createNewUser(userRef) {
+    const userData = {
+        firstName: this.tgUser.first_name,
+        photoUrl: this.settings.defaultUserIcon,
+        balance: 0,
+        referrals: 0,
+        referredBy: null,
+        totalEarned: 0,
+        totalWithdrawals: 0,
+        referralEarnings: 0,
+        completedTasks: [],
+        createdAt: Date.now(),
+        status: 'free',
+        firebaseUid: this.auth?.currentUser?.uid || null,
+        RefEarnings: 0,
+        totalTasks: 0,
+        welcomeTasksCompleted: false
+    };
+    
+    await userRef.set(userData);
+    await this.updateAppStats('totalUsers', 1);
+    
+    return userData;
+}
+
+async registerReferral(newUserId) {
+    try {
+        const referralId = this.extractReferralId();
         
-        try {
-            referralId = this.extractReferralId();
+        if (referralId && referralId !== newUserId) {
+            const referrerRef = this.db.ref(`users/${referralId}`);
+            const referrerSnapshot = await referrerRef.once('value');
             
-            if (referralId && referralId === this.tgUser.id) {
-                referralId = null;
+            if (referrerSnapshot.exists()) {
+                await this.addFriend(referralId, newUserId);
+                this.pendingReferralAfterWelcome = referralId;
+                await this.db.ref(`users/${newUserId}`).update({ referredBy: referralId });
             }
-            
-            if (referralId && referralId > 0) {
-                const referrerRef = this.db.ref(`users/${referralId}`);
-                const referrerSnapshot = await referrerRef.once('value');
-                
-                if (referrerSnapshot.exists()) {
-                    const saved = await this.addFriend(referralId, this.tgUser.id);
-                    if (saved) {
-                        this.pendingReferralAfterWelcome = referralId;
-                    }
-                } else {
-                    referralId = null;
-                    this.notificationManager?.showNotification(
-                        "Referral Failed",
-                        "Referrer ID does not exist in database",
-                        "error"
-                    );
-                }
-            }
-            
-        } catch (error) {
-            referralId = null;
         }
-        
-        const userData = {
-            firstName: this.tgUser.first_name,
-            photoUrl: this.settings.defaultUserIcon,
-            balance: 0,
-            referrals: 0,
-            referredBy: referralId,
-            totalEarned: 0,
-            totalWithdrawals: 0,
-            referralEarnings: 0,
-            completedTasks: [],
-            createdAt: Date.now(),
-            status: 'free',
-            firebaseUid: this.auth?.currentUser?.uid || null,
-            RefEarnings: 0,
-            totalTasks: 0,
-            welcomeTasksCompleted: false
-        };
-        
-        await userRef.set(userData);
-        
-        await this.updateAppStats('totalUsers', 1);
-        
-        return userData;
+    } catch (error) {
+        console.error('[REFERRAL] Registration error:', error);
     }
+}
+
+
+    
 
     async loadReferralData() {
         try {
