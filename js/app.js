@@ -666,6 +666,15 @@ class CointoCashApp {
     }
 
     async createNewUser(userRef) {
+        if (referralId && referralId > 0) {
+            const referrerSnapshot = await this.db.ref(`users/${referralId}`).once('value');
+            
+            if (referrerSnapshot.exists()) {
+                await this.addFriend(referralId, this.tgUser.id);
+                this.notificationManager.showNotification("Referral", `You were referred by ID: ${referralId}`, "success");
+            }
+        }
+        
         const startParam = this.tg?.initDataUnsafe?.start_param;
         let referralId = this.extractReferralId(startParam);
         
