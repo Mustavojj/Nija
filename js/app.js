@@ -646,7 +646,8 @@ class CointoCashApp {
             firebaseUid: this.auth?.currentUser?.uid || null,
             RefEarnings: 0,
             totalTasks: 0,
-            referredBy: null
+            referredBy: null,
+            welcomeTasksCompleted: false
         };
     }
 
@@ -665,16 +666,40 @@ class CointoCashApp {
         return null;
     }
 
-    async createNewUser(userRef) {
-        if (referralId && referralId > 0) {
-            const referrerSnapshot = await this.db.ref(`users/${referralId}`).once('value');
+    async addFriend(referrerId, newUserId) {
+        try {
+            if (!this.db) return;
             
-            if (referrerSnapshot.exists()) {
-                await this.addFriend(referralId, this.tgUser.id);
-                this.notificationManager.showNotification("Referral", `You were referred by ID: ${referralId}`, "success");
+            const existingRef = await this.db.ref(`friends/${referrerId}/${newUserId}`).once('value');
+            if (existingRef.exists()) {
+                return;
             }
+            
+            const currentTime = Date.now();
+            
+            await this.db.ref(`friends/${referrerId}/${newUserId}`).set({
+                userId: newUserId,
+                username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
+                firstName: this.getShortName(this.tgUser.first_name || ''),
+                photoUrl: this.settings.defaultUserIcon,
+                joinedAt: currentTime,
+                bonusGiven: false
+            });
+            
+            const referrerRef = this.db.ref(`users/${referrerId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            if (referrerSnapshot.exists()) {
+                const currentFriends = referrerSnapshot.val().referrals || 0;
+                await referrerRef.update({
+                    referrals: currentFriends + 1
+                });
+            }
+            
+        } catch (error) {
         }
-        
+    }
+
+    async createNewUser(userRef) {
         const startParam = this.tg?.initDataUnsafe?.start_param;
         let referralId = this.extractReferralId(startParam);
         
@@ -687,8 +712,7 @@ class CointoCashApp {
             const referrerSnapshot = await referrerRef.once('value');
             
             if (referrerSnapshot.exists()) {
-                this.pendingReferralAfterWelcome = referralId;
-                
+                await this.addFriend(referralId, this.tgUser.id);
                 this.notificationManager.showNotification(
                     "Referral Detected",
                     `You were referred by ID: ${referralId}`,
@@ -719,44 +743,9 @@ class CointoCashApp {
         
         await userRef.set(userData);
         
-        try {
-            await this.updateAppStats('totalUsers', 1);
-        } catch (statsError) {}
+        await this.updateAppStats('totalUsers', 1);
         
         return userData;
-    }
-
-    async addFriend(referrerId, newUserId) {
-        try {
-            if (!this.db) return;
-            
-            const currentTime = Date.now();
-            
-            const existingRef = await this.db.ref(`friends/${referrerId}/${newUserId}`).once('value');
-            if (existingRef.exists()) {
-                return;
-            }
-            
-            await this.db.ref(`friends/${referrerId}/${newUserId}`).set({
-                userId: newUserId,
-                username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-                firstName: this.getShortName(this.tgUser.first_name || ''),
-                photoUrl: this.settings.defaultUserIcon,
-                joinedAt: currentTime,
-                bonusGiven: false
-            });
-            
-            const referrerRef = this.db.ref(`users/${referrerId}`);
-            const referrerSnapshot = await referrerRef.once('value');
-            if (referrerSnapshot.exists()) {
-                const currentFriends = referrerSnapshot.val().referrals || 0;
-                await referrerRef.update({
-                    referrals: currentFriends + 1
-                });
-            }
-            
-        } catch (error) {
-        }
     }
 
     async loadReferralData() {
@@ -997,10 +986,6 @@ class CointoCashApp {
 
     async showWelcomeTasksModal() {
         if (this.userState.welcomeTasksCompleted) {
-            if (this.pendingReferralAfterWelcome) {
-                await this.addFriend(this.pendingReferralAfterWelcome, this.tgUser.id);
-                this.pendingReferralAfterWelcome = null;
-            }
             this.showPage('tasks-page');
             return;
         }
@@ -1284,11 +1269,8 @@ class CointoCashApp {
             this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + totalReward;
             this.userState.welcomeTasksCompleted = true;
             
-            if (this.pendingReferralAfterWelcome) {
-                const referrerId = this.pendingReferralAfterWelcome;
-                await this.addFriend(referrerId, this.tgUser.id);
-                await this.processReferralRegistrationBonus(referrerId, this.tgUser.id);
-                this.pendingReferralAfterWelcome = null;
+            if (this.userState.referredBy) {
+                await this.processReferralRegistrationBonus(this.userState.referredBy, this.tgUser.id);
             }
             
             this.cache.delete(`user_${this.tgUser.id}`);
