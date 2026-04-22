@@ -650,16 +650,41 @@ class CointoCashApp {
         };
     }
 
+    extractReferralId(startParam) {
+        if (!startParam) return null;
+        
+        if (!isNaN(startParam)) {
+            return parseInt(startParam);
+        } else if (startParam.includes('startapp=')) {
+            const match = startParam.match(/startapp=(\d+)/);
+            if (match && match[1]) {
+                return parseInt(match[1]);
+            }
+        }
+        
+        return null;
+    }
+
     async createNewUser(userRef) {
         const startParam = this.tg?.initDataUnsafe?.start_param;
-        const referralId = this.extractReferralId(startParam);
+        let referralId = this.extractReferralId(startParam);
         
-        if (referralId !== this.tgUser.id) {
+        if (referralId && referralId === this.tgUser.id) {
+            referralId = null;
+        }
+        
+        if (referralId && referralId > 0) {
             const referrerRef = this.db.ref(`users/${referralId}`);
             const referrerSnapshot = await referrerRef.once('value');
             
             if (referrerSnapshot.exists()) {
                 this.pendingReferralAfterWelcome = referralId;
+                
+                this.notificationManager.showNotification(
+                    "Referral Detected",
+                    `You were referred by ID: ${referralId}`,
+                    "success"
+                );
             } else {
                 referralId = null;
             }
@@ -3027,7 +3052,7 @@ class CointoCashApp {
         const referralsPage = document.getElementById('referrals-page');
         if (!referralsPage) return;
         
-        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
+        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
         const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
         const pendingRefEarnings = this.safeNumber(this.userState.RefEarnings || 0);
@@ -3506,21 +3531,7 @@ class CointoCashApp {
         
         return userData;
     }
-
-    extractReferralId(startParam) {
-    if (!startParam) return null;
-    
-    if (!isNaN(startParam)) {
-        return parseInt(startParam);
-    } else if (startParam.includes('startapp=')) {
-        const match = startParam.match(/startapp=(\d+)/);
-        if (match && match[1]) {
-            return parseInt(match[1]);
-        }
-    }
-    
-    return null;
-    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.Telegram || !window.Telegram.WebApp) {
