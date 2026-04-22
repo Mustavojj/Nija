@@ -654,24 +654,26 @@ class CointoCashApp {
         const startParam = this.tg?.initDataUnsafe?.start_param;
         
         if (startParam) {
-            referralId = this.extractReferralId(startParam);
+            const match = startParam.match(/(\d+)/);
+            if (match) {
+                referralId = parseInt(match[1]);
+            }
+        }
+        
+        if (referralId && referralId > 0 && referralId !== this.tgUser.id) {
+            const referrerRef = this.db.ref(`users/${referralId}`);
+            const referrerSnapshot = await referrerRef.once('value');
             
-            if (referralId && referralId > 0 && referralId !== this.tgUser.id) {
-                const referrerRef = this.db.ref(`users/${referralId}`);
-                const referrerSnapshot = await referrerRef.once('value');
-                if (referrerSnapshot.exists()) {
-                    this.pendingReferralAfterWelcome = referralId;
-                    
-                    await this.db.ref(`friends/${referralId}/${this.tgUser.id}`).set({
-                        userId: this.tgUser.id,
-                        username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-                        firstName: this.getShortName(this.tgUser.first_name || ''),
-                        photoUrl: this.settings.defaultUserIcon,
-                        joinedAt: Date.now()
-                    });
-                } else {
-                    referralId = null;
-                }
+            if (referrerSnapshot.exists()) {
+                this.pendingReferralAfterWelcome = referralId;
+                
+                await this.db.ref(`friends/${referralId}/${this.tgUser.id}`).set({
+                    userId: this.tgUser.id,
+                    username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
+                    firstName: this.getShortName(this.tgUser.first_name || ''),
+                    photoUrl: this.settings.defaultUserIcon,
+                    joinedAt: Date.now()
+                });
             } else {
                 referralId = null;
             }
@@ -770,7 +772,7 @@ class CointoCashApp {
             this.updateHeader();
             this.renderReferralsPage();
             
-            this.notificationManager.showNotification("Success", `${this.pendingRefEarnings.toFixed(4)} TON added to balance`, "success");
+            this.notificationManager.showNotification("Success", `${(newBalance - currentBalance).toFixed(4)} TON added to balance`, "success");
             
         } catch (error) {
             this.notificationManager.showNotification("Error", "Failed to claim earnings", "error");
@@ -2697,7 +2699,6 @@ class CointoCashApp {
                             resolve(true);
                         })
                         .catch((e) => {
-                            console.error('Giga ad error:', e);
                             resolve(false);
                         });
                 });
@@ -3486,18 +3487,9 @@ class CointoCashApp {
     extractReferralId(startParam) {
         if (!startParam) return null;
         
-        if (!isNaN(startParam)) {
-            return parseInt(startParam);
-        } else if (startParam.includes('startapp=')) {
-            const match = startParam.match(/startapp=(\d+)/);
-            if (match && match[1]) {
-                return parseInt(match[1]);
-            }
-        } else if (startParam.includes('=')) {
-            const parts = startParam.split('=');
-            if (parts.length > 1 && !isNaN(parts[1])) {
-                return parseInt(parts[1]);
-            }
+        const match = startParam.match(/(\d+)/);
+        if (match) {
+            return parseInt(match[1]);
         }
         
         return null;
