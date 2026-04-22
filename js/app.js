@@ -651,65 +651,64 @@ class CointoCashApp {
         };
     }
 
-
-extractReferralId() {
-    let startParam = null;
-    
-    try {
-        if (this.tg?.initDataUnsafe?.start_param) {
-            startParam = this.tg.initDataUnsafe.start_param;
-        }
+    extractReferralId() {
+        let startParam = null;
         
-        if (!startParam && this.tg?.initData) {
-            const params = new URLSearchParams(this.tg.initData);
-            startParam = params.get('start_param');
-        }
-        
-        if (!startParam && window.location.href.includes('startapp=')) {
-            const match = window.location.href.match(/startapp=(\d+)/);
-            if (match) startParam = match[1];
-        }
-        
-        let referralId = null;
-        
-        if (startParam) {
-            if (startParam.includes('startapp=')) {
-                const match = startParam.match(/startapp=(\d+)/);
-                if (match) referralId = parseInt(match[1]);
-            } else if (/^\d+$/.test(startParam)) {
-                referralId = parseInt(startParam);
+        try {
+            if (this.tg?.initDataUnsafe?.start_param) {
+                startParam = this.tg.initDataUnsafe.start_param;
             }
+            
+            if (!startParam && this.tg?.initData) {
+                const params = new URLSearchParams(this.tg.initData);
+                startParam = params.get('start_param');
+            }
+            
+            if (!startParam && window.location.href.includes('startapp=')) {
+                const match = window.location.href.match(/startapp=(\d+)/);
+                if (match) startParam = match[1];
+            }
+            
+            let referralId = null;
+            
+            if (startParam) {
+                if (startParam.includes('startapp=')) {
+                    const match = startParam.match(/startapp=(\d+)/);
+                    if (match) referralId = parseInt(match[1]);
+                } else if (/^\d+$/.test(startParam)) {
+                    referralId = parseInt(startParam);
+                }
+            }
+            
+            if (referralId && referralId !== this.tgUser?.id) {
+                this.notificationManager?.showNotification(
+                    "Referral Detected",
+                    `You were referred by ID: ${referralId}`,
+                    "success"
+                );
+            } else if (startParam && !referralId) {
+                this.notificationManager?.showNotification(
+                    "Invalid Referral",
+                    `Referral ID not valid: ${startParam}`,
+                    "warning"
+                );
+            }
+            
+            return referralId;
+            
+        } catch (error) {
+            this.notificationManager?.showNotification("Error", "Failed to extract referral: " + error.message, "error");
+            return null;
         }
-        
-        if (referralId && referralId !== this.tgUser?.id) {
-            this.notificationManager.showNotification(
-                "Referral Detected",
-                `You were referred by ID: ${referralId}`,
-                "success"
-            );
-        } else if (startParam && !referralId) {
-            this.notificationManager.showNotification(
-                "Invalid Referral",
-                `Referral ID not valid: ${startParam}`,
-                "warning"
-            );
-        }
-        
-        return referralId;
-        
-    } catch (error) {
-        this.notificationManager.showNotification("Error", "Failed to extract referral", "error");
-        return null;
     }
-}
 
     async addFriend(referrerId, newUserId) {
         try {
-            if (!this.db) return;
+            if (!this.db) return false;
             
             const existingRef = await this.db.ref(`friends/${referrerId}/${newUserId}`).once('value');
             if (existingRef.exists()) {
-                return;
+                return true;
             }
             
             const currentTime = Date.now();
@@ -732,32 +731,60 @@ extractReferralId() {
                 });
             }
             
+            this.notificationManager?.showNotification(
+                "Referral Saved",
+                `You have been successfully referred by ID: ${referrerId}`,
+                "success"
+            );
+            
+            return true;
+            
         } catch (error) {
+            this.notificationManager?.showNotification(
+                "Referral Error",
+                "Failed to save referral: " + error.message,
+                "error"
+            );
+            return false;
         }
     }
 
     async createNewUser(userRef) {
-        const startParam = this.tg?.initDataUnsafe?.start_param;
-        let referralId = this.extractReferralId(startParam);
+        let referralId = null;
         
-        if (referralId && referralId === this.tgUser.id) {
-            referralId = null;
-        }
-        
-        if (referralId && referralId > 0) {
-            const referrerRef = this.db.ref(`users/${referralId}`);
-            const referrerSnapshot = await referrerRef.once('value');
+        try {
+            referralId = this.extractReferralId();
             
-            if (referrerSnapshot.exists()) {
-                await this.addFriend(referralId, this.tgUser.id);
-                this.notificationManager.showNotification(
-                    "Referral Detected",
-                    `You were referred by ID: ${referralId}`,
-                    "success"
-                );
-            } else {
+            if (referralId && referralId === this.tgUser.id) {
                 referralId = null;
             }
+            
+            if (referralId && referralId > 0) {
+                const referrerRef = this.db.ref(`users/${referralId}`);
+                const referrerSnapshot = await referrerRef.once('value');
+                
+                if (referrerSnapshot.exists()) {
+                    const saved = await this.addFriend(referralId, this.tgUser.id);
+                    if (saved) {
+                        this.pendingReferralAfterWelcome = referralId;
+                    }
+                } else {
+                    referralId = null;
+                    this.notificationManager?.showNotification(
+                        "Referral Failed",
+                        "Referrer ID does not exist in database",
+                        "error"
+                    );
+                }
+            }
+            
+        } catch (error) {
+            this.notificationManager?.showNotification(
+                "Referral Error",
+                "Failed to process referral during registration: " + error.message,
+                "error"
+            );
+            referralId = null;
         }
         
         const userData = {
