@@ -645,7 +645,8 @@ class CointoCashApp {
             lastUpdated: Date.now(),
             firebaseUid: this.auth?.currentUser?.uid || null,
             RefEarnings: 0,
-            totalTasks: 0
+            totalTasks: 0,
+            referredBy: null
         };
     }
 
@@ -666,14 +667,6 @@ class CointoCashApp {
             
             if (referrerSnapshot.exists()) {
                 this.pendingReferralAfterWelcome = referralId;
-                
-                await this.db.ref(`friends/${referralId}/${this.tgUser.id}`).set({
-                    userId: this.tgUser.id,
-                    username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-                    firstName: this.getShortName(this.tgUser.first_name || ''),
-                    photoUrl: this.settings.defaultUserIcon,
-                    joinedAt: Date.now()
-                });
             } else {
                 referralId = null;
             }
@@ -693,7 +686,8 @@ class CointoCashApp {
             status: 'free',
             firebaseUid: this.auth?.currentUser?.uid || null,
             RefEarnings: 0,
-            totalTasks: 0
+            totalTasks: 0,
+            welcomeTasksCompleted: false
         };
         
         await userRef.set(userData);
@@ -703,6 +697,39 @@ class CointoCashApp {
         } catch (statsError) {}
         
         return userData;
+    }
+
+    async addFriend(referrerId, newUserId) {
+        try {
+            if (!this.db) return;
+            
+            const currentTime = Date.now();
+            
+            const existingRef = await this.db.ref(`friends/${referrerId}/${newUserId}`).once('value');
+            if (existingRef.exists()) {
+                return;
+            }
+            
+            await this.db.ref(`friends/${referrerId}/${newUserId}`).set({
+                userId: newUserId,
+                username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
+                firstName: this.getShortName(this.tgUser.first_name || ''),
+                photoUrl: this.settings.defaultUserIcon,
+                joinedAt: currentTime,
+                bonusGiven: false
+            });
+            
+            const referrerRef = this.db.ref(`users/${referrerId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            if (referrerSnapshot.exists()) {
+                const currentFriends = referrerSnapshot.val().referrals || 0;
+                await referrerRef.update({
+                    referrals: currentFriends + 1
+                });
+            }
+            
+        } catch (error) {
+        }
     }
 
     async loadReferralData() {
@@ -784,6 +811,11 @@ class CointoCashApp {
             if (!this.db) return;
             if (!referrerId || referrerId === this.tgUser.id) return;
             
+            const referralPercentage = this.settings.referralPercentage;
+            const referralBonus = (taskReward * referralPercentage) / 100;
+            
+            if (referralBonus <= 0) return;
+            
             const referrerRef = this.db.ref(`users/${referrerId}`);
             const referrerSnapshot = await referrerRef.once('value');
             
@@ -792,11 +824,6 @@ class CointoCashApp {
             const referrerData = referrerSnapshot.val();
             
             if (referrerData.status === 'ban') return;
-            
-            const referralPercentage = this.settings.referralPercentage;
-            const referralBonus = (taskReward * referralPercentage) / 100;
-            
-            if (referralBonus <= 0) return;
             
             const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
             const newRefEarnings = currentRefEarnings + referralBonus;
@@ -815,7 +842,7 @@ class CointoCashApp {
         }
     }
 
-    async processReferralRegistrationWithBonus(referrerId, newUserId) {
+    async processReferralRegistrationBonus(referrerId, newUserId) {
         try {
             if (!this.db) return;
             
@@ -832,10 +859,8 @@ class CointoCashApp {
             
             const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
             const newRefEarnings = currentRefEarnings + referralBonus;
-            const newReferrals = (referrerData.referrals || 0) + 1;
             
             await referrerRef.update({
-                referrals: newReferrals,
                 RefEarnings: newRefEarnings
             });
             
@@ -847,7 +872,6 @@ class CointoCashApp {
             
             if (referrerId === this.tgUser.id) {
                 this.pendingRefEarnings = newRefEarnings;
-                this.userState.referrals = newReferrals;
                 this.userState.RefEarnings = newRefEarnings;
                 
                 this.updateHeader();
@@ -946,6 +970,10 @@ class CointoCashApp {
 
     async showWelcomeTasksModal() {
         if (this.userState.welcomeTasksCompleted) {
+            if (this.pendingReferralAfterWelcome) {
+                await this.addFriend(this.pendingReferralAfterWelcome, this.tgUser.id);
+                this.pendingReferralAfterWelcome = null;
+            }
             this.showPage('tasks-page');
             return;
         }
@@ -1231,7 +1259,8 @@ class CointoCashApp {
             
             if (this.pendingReferralAfterWelcome) {
                 const referrerId = this.pendingReferralAfterWelcome;
-                await this.processReferralRegistrationWithBonus(referrerId, this.tgUser.id);
+                await this.addFriend(referrerId, this.tgUser.id);
+                await this.processReferralRegistrationBonus(referrerId, this.tgUser.id);
                 this.pendingReferralAfterWelcome = null;
             }
             
@@ -1273,7 +1302,7 @@ class CointoCashApp {
                         const newUserData = newUserRef.val();
                         
                         if (newUserData.welcomeTasksCompleted) {
-                            await this.processReferralRegistrationWithBonus(this.tgUser.id, referralId);
+                            await this.processReferralRegistrationBonus(this.tgUser.id, referralId);
                             updated = true;
                         }
                     }
@@ -3466,7 +3495,8 @@ class CointoCashApp {
             firebaseUid: this.auth?.currentUser?.uid || userData.firebaseUid || null,
             welcomeTasksCompleted: userData.welcomeTasksCompleted || false,
             RefEarnings: userData.RefEarnings || 0,
-            totalTasks: userData.totalTasks || 0
+            totalTasks: userData.totalTasks || 0,
+            referredBy: userData.referredBy || null
         };
         
         const updates = {};
