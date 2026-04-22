@@ -2823,3 +2823,105 @@ body, button, input, .form-input, .task-btn, .withdraw-btn, .copy-btn, .promo-bt
 .form-label {
     font-weight: 700 !important;
     }
+
+    /* أضف هذا الكود في نهاية ملف css/styles.css */
+
+.referral-earnings-card {
+    background: #111111;
+    border-radius: 20px;
+    padding: 20px;
+    margin: 15px 0;
+    border: 1px solid #333333;
+}
+
+.earnings-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.earnings-icon {
+    width: 50px;
+    height: 50px;
+    background: #222222;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #3b82f6;
+    border: 1px solid #333333;
+}
+
+.earnings-info h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 5px 0;
+}
+
+.earnings-amount {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #3b82f6;
+    margin: 0;
+    font-family: monospace;
+}
+
+.claim-earnings-btn {
+    width: 100%;
+    padding: 14px;
+    background: #222222;
+    border: 1px solid #3b82f6;
+    border-radius: 14px;
+    color: #3b82f6;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.claim-earnings-btn:not(.disabled):hover {
+    background: #3b82f6;
+    color: white;
+    transform: translateY(-3px);
+}
+
+.claim-earnings-btn.disabled {
+    background: #222222;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border: 1px solid #333333;
+}
+
+.add-balance-btn {
+    transition: none !important;
+    animation: none !important;
+}
+
+.add-balance-btn:active {
+    transform: none !important;
+}
+
+body, button, input, .form-input, .task-btn, .withdraw-btn, .copy-btn, .promo-btn, .ad-btn, .quest-claim-btn, .nav-btn span, .user-name, .balance-amount, .link-display, .stat-value, .info-content h4, .quest-title, .referral-row-username, .task-reward-amount, .history-title, .detail-label, .detail-value {
+    font-weight: 600 !important;
+}
+
+.task-category-title, .quests-section h3, .referral-stats-section h3, .last-referrals-section h3, .history-section h3 {
+    font-weight: 800 !important;
+}
+
+.welcome-task-info h4, .welcome-header h3, .deposit-modal-header h3 {
+    font-weight: 800 !important;
+}
+
+.form-label {
+    font-weight: 700 !important;
+    }
