@@ -653,13 +653,16 @@ class CointoCashApp {
     async createNewUser(userRef) {
         let referralId = null;
         const startParam = this.tg?.initDataUnsafe?.start_param;
-        
-        if (startParam) {
-            const match = startParam.match(/(\d+)/);
-            if (match) {
-                referralId = parseInt(match[1]);
-            }
-        }
+let referralId = null;
+
+if (startParam) {
+    if (!isNaN(startParam)) {
+        referralId = parseInt(startParam);
+    } else if (startParam.includes('startapp=')) {
+        const match = startParam.match(/startapp=(\d+)/);
+        if (match && match[1]) referralId = parseInt(match[1]);
+    }
+}
         
         if (referralId !== this.tgUser.id) {
             const referrerRef = this.db.ref(`users/${referralId}`);
