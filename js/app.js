@@ -651,18 +651,8 @@ class CointoCashApp {
     }
 
     async createNewUser(userRef) {
-        let referralId = null;
         const startParam = this.tg?.initDataUnsafe?.start_param;
-let referralId = null;
-
-if (startParam) {
-    if (!isNaN(startParam)) {
-        referralId = parseInt(startParam);
-    } else if (startParam.includes('startapp=')) {
-        const match = startParam.match(/startapp=(\d+)/);
-        if (match && match[1]) referralId = parseInt(match[1]);
-    }
-}
+        const referralId = this.extractReferralId(startParam);
         
         if (referralId !== this.tgUser.id) {
             const referrerRef = this.db.ref(`users/${referralId}`);
@@ -3518,16 +3508,19 @@ if (startParam) {
     }
 
     extractReferralId(startParam) {
-        if (!startParam) return null;
-        
-        const match = startParam.match(/(\d+)/);
-        if (match) {
+    if (!startParam) return null;
+    
+    if (!isNaN(startParam)) {
+        return parseInt(startParam);
+    } else if (startParam.includes('startapp=')) {
+        const match = startParam.match(/startapp=(\d+)/);
+        if (match && match[1]) {
             return parseInt(match[1]);
         }
-        
-        return null;
     }
-}
+    
+    return null;
+    }
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.Telegram || !window.Telegram.WebApp) {
