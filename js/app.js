@@ -651,20 +651,57 @@ class CointoCashApp {
         };
     }
 
-    extractReferralId(startParam) {
-        if (!startParam) return null;
+
+extractReferralId() {
+    let startParam = null;
+    
+    try {
+        if (this.tg?.initDataUnsafe?.start_param) {
+            startParam = this.tg.initDataUnsafe.start_param;
+        }
         
-        if (!isNaN(startParam)) {
-            return parseInt(startParam);
-        } else if (startParam.includes('startapp=')) {
-            const match = startParam.match(/startapp=(\d+)/);
-            if (match && match[1]) {
-                return parseInt(match[1]);
+        if (!startParam && this.tg?.initData) {
+            const params = new URLSearchParams(this.tg.initData);
+            startParam = params.get('start_param');
+        }
+        
+        if (!startParam && window.location.href.includes('startapp=')) {
+            const match = window.location.href.match(/startapp=(\d+)/);
+            if (match) startParam = match[1];
+        }
+        
+        let referralId = null;
+        
+        if (startParam) {
+            if (startParam.includes('startapp=')) {
+                const match = startParam.match(/startapp=(\d+)/);
+                if (match) referralId = parseInt(match[1]);
+            } else if (/^\d+$/.test(startParam)) {
+                referralId = parseInt(startParam);
             }
         }
         
+        if (referralId && referralId !== this.tgUser?.id) {
+            this.notificationManager.showNotification(
+                "Referral Detected",
+                `You were referred by ID: ${referralId}`,
+                "success"
+            );
+        } else if (startParam && !referralId) {
+            this.notificationManager.showNotification(
+                "Invalid Referral",
+                `Referral ID not valid: ${startParam}`,
+                "warning"
+            );
+        }
+        
+        return referralId;
+        
+    } catch (error) {
+        this.notificationManager.showNotification("Error", "Failed to extract referral", "error");
         return null;
     }
+}
 
     async addFriend(referrerId, newUserId) {
         try {
