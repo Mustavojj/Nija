@@ -3034,7 +3034,7 @@ class CointoCashApp {
         const referralsPage = document.getElementById('referrals-page');
         if (!referralsPage) return;
         
-        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
+        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
         const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
         const pendingRefEarnings = this.safeNumber(this.userState.RefEarnings || 0);
