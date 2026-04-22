@@ -50,7 +50,9 @@ class CointoCashApp {
         this.isInitializing = false;
         this.userWithdrawals = [];
         this.appStats = {
-            totalUsers: 0
+            totalUsers: 0,
+            totalPayments: 0,
+            totalWithdrawals: 0
         };
         
         this.pages = [
@@ -103,8 +105,9 @@ class CointoCashApp {
         
         this.userCreatedTasks = [];
         
-        this.referralEarnings = 0;
         this.pendingRefEarnings = 0;
+        this.totalRefEarnings = 0;
+        this.friendsList = [];
     }
 
     getRateLimiterClass() {
@@ -114,8 +117,7 @@ class CointoCashApp {
                 this.limits = {
                     'task_start': { limit: 1, window: 3000 },
                     'withdrawal': { limit: 1, window: 86400000 },
-                    'ad_reward': { limit: 10, window: 300000 },
-                    'claim_ref': { limit: 1, window: 5000 }
+                    'ad_reward': { limit: 10, window: 300000 }
                 };
             }
 
@@ -144,226 +146,174 @@ class CointoCashApp {
         };
     }
 
+                
+            
+    
     async initialize() {
-        if (this.isInitializing || this.isInitialized) return;
+    if (this.isInitializing || this.isInitialized) return;
+    
+    this.isInitializing = true;
+    
+    try {
+        this.showLoadingProgressWithMessage(5, "Loading...");
         
-        this.isInitializing = true;
+        if (!window.Telegram || !window.Telegram.WebApp) {
+            this.showError("Please open from Telegram Mini App");
+            return;
+        }
+        
+        this.tg = window.Telegram.WebApp;
+        
+        if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
+            this.showError("User data not available");
+            return;
+        }
+        
+        this.tgUser = this.tg.initDataUnsafe.user;
+        
+        this.showLoadingProgressWithMessage(10, "Loading...");
+        
+        this.showLoadingProgressWithMessage(15, "Loading...");
+        this.tg.ready();
+        this.tg.expand();
+        
+        this.showLoadingProgressWithMessage(20, "Loading...");
+        this.setupTelegramTheme();
+        
+        this.notificationManager = new NotificationManager();
+        
+        this.showLoadingProgressWithMessage(25, "Loading...");
+        
+        const firebaseSuccess = await this.initializeFirebase();
+        
+        if (firebaseSuccess) {
+            this.setupFirebaseAuth();
+        }
+        
+        this.showLoadingProgressWithMessage(35, "Loading...");
+        await this.loadSettingsFromFirebase();
+        
+        this.showLoadingProgressWithMessage(45, "Loading...");
+        await this.loadUserData();
+        
+        if (this.userState.status === 'ban') {
+            this.showBannedPage();
+            return;
+        }
+        
+        this.showLoadingProgressWithMessage(55, "Loading...");
+        
+        this.adManager = new AdManager(this);
+        this.taskManager = new TaskManager(this);
+        this.questManager = new QuestManager(this);
+        this.referralManager = new ReferralManager(this);
+        
+        this.startReferralMonitor();
+        
+        this.showLoadingProgressWithMessage(60, "Loading...");
+        try {
+            await this.loadTasksData();
+        } catch (taskError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(70, "Loading...");
+        try {
+            await this.loadHistoryData();
+        } catch (historyError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(80, "Loading...");
+        try {
+            await this.loadAppStats();
+        } catch (statsError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(88, "Loading...");
+        try {
+            await this.loadAdTimers();
+            await this.loadUserCreatedTasks();
+            await this.loadReferralData();
+        } catch (adError) {
+            this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
+        }
+        
+        this.showLoadingProgressWithMessage(95, "Loading...");
+        this.renderUI();
+        
+        this.darkMode = true;
+        document.body.classList.add('dark-mode');
+        
+        this.isInitialized = true;
+        this.isInitializing = false;
+        
+        this.showLoadingProgressWithMessage(100, "Ready!");
+        
+        setTimeout(() => {
+            const appLoader = document.getElementById('app-loader');
+            const app = document.getElementById('app');
+            
+            if (appLoader) {
+                appLoader.style.opacity = '0';
+                appLoader.style.transition = 'opacity 0.5s ease';
+                
+                setTimeout(() => {
+                    appLoader.style.display = 'none';
+                }, 500);
+            }
+            
+            if (app) {
+                app.style.display = 'block';
+                setTimeout(() => {
+                    app.style.opacity = '1';
+                    app.style.transition = 'opacity 0.3s ease';
+                }, 50);
+            }
+            
+            this.showWelcomeTasksModal();
+            
+        }, 500);
+        
+    } catch (error) {
+        this.notificationManager?.showNotification(
+            "Initialization Error",
+            "Error at: " + (error.message || "Unknown"),
+            "error"
+        );
         
         try {
-            this.showLoadingProgressWithMessage(5, "Loading...");
-            
-            if (!window.Telegram || !window.Telegram.WebApp) {
-                this.showError("Please open from Telegram Mini App");
-                return;
-            }
-            
-            this.tg = window.Telegram.WebApp;
-            
-            if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
-                this.showError("User data not available");
-                return;
-            }
-            
-            this.tgUser = this.tg.initDataUnsafe.user;
-            
-            this.showLoadingProgressWithMessage(10, "Loading...");
-            const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id);
-            if (!multiAccountAllowed) {
-                this.isInitializing = false;
-                return;
-            }
-            
-            this.showLoadingProgressWithMessage(15, "Loading...");
-            this.tg.ready();
-            this.tg.expand();
-            
-            this.showLoadingProgressWithMessage(20, "Loading...");
-            this.setupTelegramTheme();
-            
-            this.notificationManager = new NotificationManager();
-            
-            this.showLoadingProgressWithMessage(25, "Loading...");
-            
-            const firebaseSuccess = await this.initializeFirebase();
-            
-            if (firebaseSuccess) {
-                this.setupFirebaseAuth();
-            }
-            
-            this.showLoadingProgressWithMessage(35, "Loading...");
-            await this.loadSettingsFromFirebase();
-            
-            this.showLoadingProgressWithMessage(45, "Loading...");
-            await this.loadUserData();
-            
-            if (this.userState.status === 'ban') {
-                this.showBannedPage();
-                return;
-            }
-            
-            this.showLoadingProgressWithMessage(55, "Loading...");
-            
-            this.adManager = new AdManager(this);
-            this.taskManager = new TaskManager(this);
-            this.questManager = new QuestManager(this);
-            this.referralManager = new ReferralManager(this);
-            
-            this.startReferralMonitor();
-            
-            this.showLoadingProgressWithMessage(60, "Loading...");
-            try {
-                await this.loadTasksData();
-            } catch (taskError) {
-                this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
-            }
-            
-            this.showLoadingProgressWithMessage(70, "Loading...");
-            try {
-                await this.loadHistoryData();
-            } catch (historyError) {
-                this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
-            }
-            
-            this.showLoadingProgressWithMessage(80, "Loading...");
-            try {
-                await this.loadAppStats();
-            } catch (statsError) {
-                this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
-            }
-            
-            this.showLoadingProgressWithMessage(88, "Loading...");
-            try {
-                await this.loadAdTimers();
-                await this.loadUserCreatedTasks();
-                await this.loadReferralEarnings();
-            } catch (adError) {
-                this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
-            }
-            
-            this.showLoadingProgressWithMessage(95, "Loading...");
+            this.userState = this.getDefaultUserState();
             this.renderUI();
             
-            this.darkMode = true;
-            document.body.classList.add('dark-mode');
+            const appLoader = document.getElementById('app-loader');
+            const app = document.getElementById('app');
             
-            this.isInitialized = true;
-            this.isInitializing = false;
+            if (appLoader) appLoader.style.display = 'none';
+            if (app) app.style.display = 'block';
             
-            this.showLoadingProgressWithMessage(100, "Ready!");
-            
-            setTimeout(() => {
-                const appLoader = document.getElementById('app-loader');
-                const app = document.getElementById('app');
-                
-                if (appLoader) {
-                    appLoader.style.opacity = '0';
-                    appLoader.style.transition = 'opacity 0.5s ease';
-                    
-                    setTimeout(() => {
-                        appLoader.style.display = 'none';
-                    }, 500);
-                }
-                
-                if (app) {
-                    app.style.display = 'block';
-                    setTimeout(() => {
-                        app.style.opacity = '1';
-                        app.style.transition = 'opacity 0.3s ease';
-                    }, 50);
-                }
-                
-                this.showWelcomeTasksModal();
-                
-            }, 500);
-            
-        } catch (error) {
-            this.notificationManager?.showNotification(
-                "Initialization Error",
-                "Error at: " + (error.message || "Unknown"),
-                "error"
-            );
-            
-            try {
-                this.userState = this.getDefaultUserState();
-                this.renderUI();
-                
-                const appLoader = document.getElementById('app-loader');
-                const app = document.getElementById('app');
-                
-                if (appLoader) appLoader.style.display = 'none';
-                if (app) app.style.display = 'block';
-                
-            } catch (renderError) {
-                this.showError("Failed to initialize app: " + error.message);
-            }
-            
-            this.isInitializing = false;
+        } catch (renderError) {
+            this.showError("Failed to initialize app: " + error.message);
         }
+        
+        this.isInitializing = false;
     }
+}
 
-    showLoadingProgressWithMessage(percent, message) {
-        const progressBar = document.getElementById('loading-progress-bar');
-        if (progressBar) {
-            progressBar.style.width = percent + '%';
-            progressBar.style.transition = 'width 0.3s ease';
-        }
-        
-        const loadingPercentage = document.getElementById('loading-percentage');
-        if (loadingPercentage) {
-            loadingPercentage.textContent = `${percent}% - ${message}`;
-        }
+showLoadingProgressWithMessage(percent, message) {
+    const progressBar = document.getElementById('loading-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+        progressBar.style.transition = 'width 0.3s ease';
     }
-
-    async loadReferralEarnings() {
-        try {
-            if (!this.db || !this.tgUser) return;
-            const earningsRef = await this.db.ref(`users/${this.tgUser.id}/RefEarnings`).once('value');
-            this.referralEarnings = this.safeNumber(earningsRef.val() || 0);
-            this.pendingRefEarnings = this.referralEarnings;
-        } catch (error) {
-            this.referralEarnings = 0;
-            this.pendingRefEarnings = 0;
-        }
+    
+    const loadingPercentage = document.getElementById('loading-percentage');
+    if (loadingPercentage) {
+        loadingPercentage.textContent = `${percent}% - ${message}`;
     }
-
-    async claimReferralEarnings() {
-        if (this.referralEarnings <= 0.00001) {
-            this.notificationManager.showNotification("Claim", "No referral earnings to claim", "warning");
-            return;
-        }
-        
-        const rateLimitCheck = this.rateLimiter.checkLimit(this.tgUser.id, 'claim_ref');
-        if (!rateLimitCheck.allowed) {
-            this.notificationManager.showNotification("Rate Limit", `Please wait ${rateLimitCheck.remaining} seconds`, "warning");
-            return;
-        }
-        
-        this.rateLimiter.addRequest(this.tgUser.id, 'claim_ref');
-        
-        try {
-            const currentBalance = this.safeNumber(this.userState.balance);
-            const newBalance = currentBalance + this.referralEarnings;
-            
-            if (this.db) {
-                await this.db.ref(`users/${this.tgUser.id}`).update({
-                    balance: newBalance,
-                    RefEarnings: 0
-                });
-            }
-            
-            this.userState.balance = newBalance;
-            this.referralEarnings = 0;
-            this.pendingRefEarnings = 0;
-            
-            this.notificationManager.showNotification("Claimed", `${this.referralEarnings.toFixed(4)} TON added to balance`, "success");
-            
-            this.updateHeader();
-            this.renderReferralsPage();
-            
-        } catch (error) {
-            this.notificationManager.showNotification("Error", "Failed to claim earnings", "error");
-        }
-    }
+}
+    
 
     async loadWelcomeTasksFromFirebase() {
         try {
@@ -547,7 +497,6 @@ class CointoCashApp {
                 };
                 
                 await userRef.set(userData);
-                await this.updateAppStats('totalUsers', 1);
             } else {
                 await userRef.update({
                     firebaseUid: firebaseUid
@@ -596,7 +545,6 @@ class CointoCashApp {
                 userData = await this.updateExistingUser(userRef, userData);
             } else {
                 userData = await this.createNewUser(userRef);
-                await this.updateAppStats('totalUsers', 1);
             }
             
             if (userData.firebaseUid !== this.auth.currentUser.uid) {
@@ -624,29 +572,22 @@ class CointoCashApp {
 
     getDefaultUserState() {
         return {
-            username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             firstName: this.getShortName(this.tgUser.first_name || 'User'),
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
             totalEarned: 0,
-            totalTasks: 0,
             totalWithdrawals: 0,
             completedTasks: [],
             referralEarnings: 0,
-            RefEarnings: 0,
             status: 'free',
+            lastUpdated: Date.now(),
             firebaseUid: this.auth?.currentUser?.uid || null,
-            welcomeTasksCompleted: false
+            RefEarnings: 0
         };
     }
 
     async createNewUser(userRef) {
-        const multiAccountAllowed = await this.checkMultiAccount(this.tgUser.id, false);
-        if (!multiAccountAllowed) {
-            return this.getDefaultUserState();
-        }
-        
         let referralId = null;
         const startParam = this.tg?.initDataUnsafe?.start_param;
         
@@ -659,7 +600,11 @@ class CointoCashApp {
                 if (referrerSnapshot.exists()) {
                     this.pendingReferralAfterWelcome = referralId;
                     
-                    await this.db.ref(`referrals/${referralId}/${this.tgUser.id}`).set({
+                    await this.db.ref(`friends/${referralId}/${this.tgUser.id}`).set({
+                        userId: this.tgUser.id,
+                        username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
+                        firstName: this.getShortName(this.tgUser.first_name || ''),
+                        photoUrl: this.settings.defaultUserIcon,
                         joinedAt: Date.now()
                     });
                 } else {
@@ -671,197 +616,105 @@ class CointoCashApp {
         }
         
         const userData = {
-            username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
             firstName: this.tgUser.first_name,
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
             referrals: 0,
             referredBy: referralId,
             totalEarned: 0,
-            totalTasks: 0,
             totalWithdrawals: 0,
             referralEarnings: 0,
-            RefEarnings: 0,
             completedTasks: [],
             createdAt: Date.now(),
-            lastActive: Date.now(),
             status: 'free',
             firebaseUid: this.auth?.currentUser?.uid || null,
-            welcomeTasksCompleted: false
+            RefEarnings: 0
         };
         
         await userRef.set(userData);
         
+        try {
+            await this.updateAppStats('totalUsers', 1);
+        } catch (statsError) {}
+        
         return userData;
     }
 
-    async checkMultiAccount(tgId, showBanPage = true) {
+    async loadReferralData() {
         try {
-            const ip = await this.getUserIP();
-            if (!ip) return true;
+            if (!this.db || !this.tgUser) return;
             
-            const ipData = JSON.parse(localStorage.getItem("ip_records")) || {};
+            const refEarningsSnapshot = await this.db.ref(`users/${this.tgUser.id}/RefEarnings`).once('value');
+            this.pendingRefEarnings = this.safeNumber(refEarningsSnapshot.val() || 0);
             
-            if (ipData[ip] && ipData[ip] !== tgId) {
-                if (showBanPage) {
-                    this.showMultiAccountBanPage();
-                }
-                
-                try {
-                    if (this.db) {
-                        await this.db.ref(`users/${tgId}`).update({
-                            status: 'ban',
-                            banReason: 'Multiple accounts detected on same IP',
-                            bannedAt: Date.now()
-                        });
-                    }
-                } catch (error) {}
-                
-                return false;
+            const totalRefSnapshot = await this.db.ref(`users/${this.tgUser.id}/referralEarnings`).once('value');
+            this.totalRefEarnings = this.safeNumber(totalRefSnapshot.val() || 0);
+            
+            const friendsSnapshot = await this.db.ref(`friends/${this.tgUser.id}`).once('value');
+            if (friendsSnapshot.exists()) {
+                this.friendsList = [];
+                friendsSnapshot.forEach(child => {
+                    this.friendsList.push({
+                        id: child.key,
+                        ...child.val()
+                    });
+                });
+            } else {
+                this.friendsList = [];
             }
             
-            if (!ipData[ip]) {
-                ipData[ip] = tgId;
-                localStorage.setItem("ip_records", JSON.stringify(ipData));
-            }
+            this.userState.referrals = this.friendsList.length;
+            this.userState.RefEarnings = this.pendingRefEarnings;
             
-            return true;
         } catch (error) {
-            return true;
+            this.pendingRefEarnings = 0;
+            this.totalRefEarnings = 0;
+            this.friendsList = [];
         }
     }
 
-    showMultiAccountBanPage() {
-        document.body.innerHTML = `
-            <div style="
-                background-color:#000000;
-                color:#fff;
-                height:100vh;
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                font-family:-apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-                padding:20px;
-            ">
-                <div style="
-                    background:#111111;
-                    border-radius:22px;
-                    padding:40px 30px;
-                    width:85%;
-                    max-width:330px;
-                    text-align:center;
-                    box-shadow:0 0 40px rgba(0,0,0,0.5);
-                    border:1px solid rgba(255,255,255,0.08);
-                    animation:fadeIn 0.6s ease-out;
-                ">
-                    <div style="margin-bottom:24px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="animation:pulse 1.8s infinite ease-in-out;">
-                            <circle cx="12" cy="12" r="10" stroke="#ff4d4d"/>
-                            <line x1="15" y1="9" x2="9" y2="15" stroke="#ff4d4d"/>
-                            <line x1="9" y1="9" x2="15" y2="15" stroke="#ff4d4d"/>
-                        </svg>
-                    </div>
-                    <h2 style="
-                        font-size:18px;
-                        font-weight:600;
-                        color:#fff;
-                        letter-spacing:0.5px;
-                    ">Multi accounts not allowed</h2>
-                    <p style="
-                        margin-top:10px;
-                        color:#9da5b4;
-                        font-size:14px;
-                        line-height:1.5;
-                    ">Access for this device has been blocked.<br>Multiple Telegram accounts detected on the same IP.</p>
-                </div>
-            </div>
-
-            <style>
-                @keyframes fadeIn {
-                    from { opacity:0; transform:scale(0.97); }
-                    to { opacity:1; transform:scale(1); }
-                }
-                @keyframes pulse {
-                    0% { transform:scale(1); opacity:1; }
-                    50% { transform:scale(1.1); opacity:0.8; }
-                    100% { transform:scale(1); opacity:1; }
-                }
-            </style>
-        `;
-    }
-
-    async getUserIP() {
+    async claimRefEarnings() {
+        if (this.pendingRefEarnings <= 0) {
+            this.notificationManager.showNotification("Claim", "No pending earnings to claim", "warning");
+            return;
+        }
+        
+        const adShown = await this.adManager?.showWithdrawalAd();
+        if (!adShown) {
+            this.notificationManager.showNotification("Ad Required", "Please watch the ad to claim earnings", "info");
+            return;
+        }
+        
         try {
-            const res = await fetch("https://api.ipify.org?format=json");
-            const data = await res.json();
-            return data.ip;
-        } catch (e) {
-            return null;
+            const currentBalance = this.safeNumber(this.userState.balance);
+            const newBalance = currentBalance + this.pendingRefEarnings;
+            const newTotalRefEarnings = this.totalRefEarnings + this.pendingRefEarnings;
+            
+            if (this.db) {
+                await this.db.ref(`users/${this.tgUser.id}`).update({
+                    balance: newBalance,
+                    RefEarnings: 0,
+                    referralEarnings: newTotalRefEarnings
+                });
+            }
+            
+            this.userState.balance = newBalance;
+            this.userState.RefEarnings = 0;
+            this.pendingRefEarnings = 0;
+            this.totalRefEarnings = newTotalRefEarnings;
+            
+            this.cache.delete(`user_${this.tgUser.id}`);
+            this.updateHeader();
+            this.renderReferralsPage();
+            
+            this.notificationManager.showNotification("Success", `${this.pendingRefEarnings.toFixed(4)} TON added to balance`, "success");
+            
+        } catch (error) {
+            this.notificationManager.showNotification("Error", "Failed to claim earnings", "error");
         }
     }
 
-    async updateExistingUser(userRef, userData) {
-        await userRef.update({ 
-            lastActive: Date.now()
-        });
-        
-        if (userData.completedTasks && Array.isArray(userData.completedTasks)) {
-            this.userCompletedTasks = new Set(userData.completedTasks);
-        } else {
-            this.userCompletedTasks = new Set();
-            userData.completedTasks = [];
-            await userRef.update({ completedTasks: [] });
-        }
-        
-        const defaultData = {
-            status: userData.status || 'free',
-            referralEarnings: userData.referralEarnings || 0,
-            RefEarnings: userData.RefEarnings || 0,
-            totalEarned: userData.totalEarned || 0,
-            totalTasks: userData.totalTasks || 0,
-            totalWithdrawals: userData.totalWithdrawals || 0,
-            balance: userData.balance || 0,
-            referrals: userData.referrals || 0,
-            firebaseUid: this.auth?.currentUser?.uid || userData.firebaseUid || null,
-            welcomeTasksCompleted: userData.welcomeTasksCompleted || false
-        };
-        
-        const updates = {};
-        Object.keys(defaultData).forEach(key => {
-            if (userData[key] === undefined) {
-                updates[key] = defaultData[key];
-                userData[key] = defaultData[key];
-            }
-        });
-        
-        if (Object.keys(updates).length > 0) {
-            await userRef.update(updates);
-        }
-        
-        return userData;
-    }
-
-    extractReferralId(startParam) {
-        if (!startParam) return null;
-        
-        if (!isNaN(startParam)) {
-            return parseInt(startParam);
-        } else if (startParam.includes('startapp=')) {
-            const match = startParam.match(/startapp=(\d+)/);
-            if (match && match[1]) {
-                return parseInt(match[1]);
-            }
-        } else if (startParam.includes('=')) {
-            const parts = startParam.split('=');
-            if (parts.length > 1 && !isNaN(parts[1])) {
-                return parseInt(parts[1]);
-            }
-        }
-        
-        return null;
-    }
-
-    async addReferralEarning(referrerId, amount) {
+    async processReferralTaskBonus(referrerId, taskReward) {
         try {
             if (!this.db) return;
             if (!referrerId || referrerId === this.tgUser.id) return;
@@ -876,7 +729,7 @@ class CointoCashApp {
             if (referrerData.status === 'ban') return;
             
             const referralPercentage = this.settings.referralPercentage;
-            const referralBonus = (amount * referralPercentage) / 100;
+            const referralBonus = (taskReward * referralPercentage) / 100;
             
             if (referralBonus <= 0) return;
             
@@ -888,15 +741,16 @@ class CointoCashApp {
             });
             
             if (referrerId === this.tgUser.id) {
-                this.referralEarnings = newRefEarnings;
                 this.pendingRefEarnings = newRefEarnings;
+                this.userState.RefEarnings = newRefEarnings;
+                this.renderReferralsPage();
             }
             
         } catch (error) {
         }
     }
 
-    async processReferralRegistration(referrerId, newUserId) {
+    async processReferralRegistrationWithBonus(referrerId, newUserId) {
         try {
             if (!this.db) return;
             
@@ -909,18 +763,31 @@ class CointoCashApp {
             
             if (referrerData.status === 'ban') return;
             
+            const referralBonus = this.settings.referralBonus;
+            
+            const currentRefEarnings = this.safeNumber(referrerData.RefEarnings || 0);
+            const newRefEarnings = currentRefEarnings + referralBonus;
             const newReferrals = (referrerData.referrals || 0) + 1;
             
             await referrerRef.update({
-                referrals: newReferrals
+                referrals: newReferrals,
+                RefEarnings: newRefEarnings
             });
             
-            if (this.tgUser && referrerId === this.tgUser.id) {
-                this.userState.referrals = newReferrals;
-                this.updateHeader();
-            }
+            await this.db.ref(`friends/${referrerId}/${newUserId}`).update({
+                bonusGiven: true,
+                verifiedAt: Date.now(),
+                bonusAmount: referralBonus
+            });
             
-            await this.refreshReferralsList();
+            if (referrerId === this.tgUser.id) {
+                this.pendingRefEarnings = newRefEarnings;
+                this.userState.referrals = newReferrals;
+                this.userState.RefEarnings = newRefEarnings;
+                
+                this.updateHeader();
+                this.renderReferralsPage();
+            }
             
         } catch (error) {
         }
@@ -969,7 +836,9 @@ class CointoCashApp {
         try {
             if (!this.db) {
                 this.appStats = {
-                    totalUsers: 0
+                    totalUsers: 0,
+                    totalPayments: 0,
+                    totalWithdrawals: 0
                 };
                 return;
             }
@@ -978,18 +847,24 @@ class CointoCashApp {
             if (statsSnapshot.exists()) {
                 const stats = statsSnapshot.val();
                 this.appStats = {
-                    totalUsers: this.safeNumber(stats.totalUsers || 0)
+                    totalUsers: this.safeNumber(stats.totalUsers || 0),
+                    totalPayments: this.safeNumber(stats.totalPayments || 0),
+                    totalWithdrawals: this.safeNumber(stats.totalWithdrawals || 0)
                 };
             } else {
                 this.appStats = {
-                    totalUsers: 0
+                    totalUsers: 0,
+                    totalPayments: 0,
+                    totalWithdrawals: 0
                 };
                 await this.db.ref('appStats').set(this.appStats);
             }
             
         } catch (error) {
             this.appStats = {
-                totalUsers: 0
+                totalUsers: 0,
+                totalPayments: 0,
+                totalWithdrawals: 0
             };
         }
     }
@@ -1000,6 +875,7 @@ class CointoCashApp {
             
             await this.db.ref(`appStats/${stat}`).transaction(current => (current || 0) + value);
             this.appStats[stat] = (this.appStats[stat] || 0) + value;
+            
         } catch (error) {}
     }
 
@@ -1280,7 +1156,6 @@ class CointoCashApp {
                 await this.db.ref(`users/${this.tgUser.id}`).update({
                     balance: newBalance,
                     totalEarned: this.safeNumber(this.userState.totalEarned) + totalReward,
-                    totalTasks: this.safeNumber(this.userState.totalTasks),
                     welcomeTasksCompleted: true
                 });
             }
@@ -1291,7 +1166,7 @@ class CointoCashApp {
             
             if (this.pendingReferralAfterWelcome) {
                 const referrerId = this.pendingReferralAfterWelcome;
-                await this.processReferralRegistration(referrerId, this.tgUser.id);
+                await this.processReferralRegistrationWithBonus(referrerId, this.tgUser.id);
                 this.pendingReferralAfterWelcome = null;
             }
             
@@ -1318,30 +1193,31 @@ class CointoCashApp {
         try {
             if (!this.db || !this.tgUser) return;
             
-            const referralsRef = await this.db.ref(`referrals/${this.tgUser.id}`).once('value');
+            const referralsRef = await this.db.ref(`friends/${this.tgUser.id}`).once('value');
             if (!referralsRef.exists()) return;
             
             const referrals = referralsRef.val();
             let updated = false;
             
             for (const referralId in referrals) {
-                const newUserRef = await this.db.ref(`users/${referralId}`).once('value');
-                if (newUserRef.exists()) {
-                    const newUserData = newUserRef.val();
-                    
-                    if (newUserData.welcomeTasksCompleted && !referrals[referralId].bonusGiven) {
-                        await this.processReferralRegistration(this.tgUser.id, referralId);
-                        await this.db.ref(`referrals/${this.tgUser.id}/${referralId}`).update({
-                            bonusGiven: true,
-                            verifiedAt: Date.now()
-                        });
-                        updated = true;
+                const referral = referrals[referralId];
+                
+                if (!referral.bonusGiven) {
+                    const newUserRef = await this.db.ref(`users/${referralId}`).once('value');
+                    if (newUserRef.exists()) {
+                        const newUserData = newUserRef.val();
+                        
+                        if (newUserData.welcomeTasksCompleted) {
+                            await this.processReferralRegistrationWithBonus(this.tgUser.id, referralId);
+                            updated = true;
+                        }
                     }
                 }
             }
             
             if (updated) {
                 this.cache.delete(`user_${this.tgUser.id}`);
+                this.cache.delete(`friends_${this.tgUser.id}`);
                 
                 if (document.getElementById('referrals-page')?.classList.contains('active')) {
                     this.renderReferralsPage();
@@ -1533,13 +1409,13 @@ class CointoCashApp {
         const addBalanceBtn = document.getElementById('add-balance-btn');
         
         if (userPhoto) {
-            userPhoto.src = this.tgUser?.photo_url || this.settings.defaultUserIcon;
+            userPhoto.src = this.tgUser.photo_url || this.settings.defaultUserIcon;
             userPhoto.oncontextmenu = (e) => e.preventDefault();
             userPhoto.ondragstart = () => false;
         }
         
         if (userName) {
-            const fullName = this.tgUser?.first_name || 'User';
+            const fullName = this.tgUser.first_name || 'User';
             userName.textContent = this.truncateName(fullName, 15);
         }
         
@@ -2058,6 +1934,12 @@ class CointoCashApp {
     }
 
     async showDeleteTaskConfirmation(task) {
+        const currentCompletions = task.currentCompletions || 0;
+        const maxCompletions = task.maxCompletions || 100;
+        const remaining = maxCompletions - currentCompletions;
+        const taskPricePer100 = this.settings.taskPrice100;
+        const refundAmount = (currentCompletions / 100) * taskPricePer100 * 0.5;
+        
         const modal = document.createElement('div');
         modal.className = 'task-modal';
         modal.innerHTML = `
@@ -2069,8 +1951,11 @@ class CointoCashApp {
                 
                 <div class="form-group">
                     <label class="form-label">Task: ${task.name}</label>
-                    <label class="form-label">Progress: ${task.currentCompletions || 0}/${task.maxCompletions || 100}</label>
+                    <label class="form-label">Progress: ${currentCompletions}/${maxCompletions}</label>
+                    <label class="form-label">Remaining: ${remaining}</label>
                 </div>
+                
+                
                 
                 <div class="task-message" id="delete-task-message" style="display: none;"></div>
                 
@@ -2692,14 +2577,12 @@ class CointoCashApp {
                 if (this.db) {
                     await this.db.ref(`users/${this.tgUser.id}`).update({
                         balance: newBalance,
-                        totalEarned: this.safeNumber(this.userState.totalEarned) + reward,
-                        totalTasks: this.safeNumber(this.userState.totalTasks) + 1
+                        totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
                 }
                 
                 this.userState.balance = newBalance;
                 this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + reward;
-                this.userState.totalTasks = this.safeNumber(this.userState.totalTasks) + 1;
                 
                 this.cache.delete(`user_${this.tgUser.id}`);
                 
@@ -2768,14 +2651,12 @@ class CointoCashApp {
                 if (this.db) {
                     await this.db.ref(`users/${this.tgUser.id}`).update({
                         balance: newBalance,
-                        totalEarned: this.safeNumber(this.userState.totalEarned) + reward,
-                        totalTasks: this.safeNumber(this.userState.totalTasks) + 1
+                        totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
                 }
                 
                 this.userState.balance = newBalance;
                 this.userState.totalEarned = this.safeNumber(this.userState.totalEarned) + reward;
-                this.userState.totalTasks = this.safeNumber(this.userState.totalTasks) + 1;
                 
                 this.cache.delete(`user_${this.tgUser.id}`);
                 
@@ -2853,7 +2734,6 @@ class CointoCashApp {
         if (!questsPage) return;
         
         const userReferrals = this.safeNumber(this.userState.referrals || 0);
-        const userTotalTasks = this.safeNumber(this.userState.totalTasks || 0);
         
         const friendsQuests = [
             { required: 10, reward: 0.01, current: userReferrals },
@@ -2862,15 +2742,7 @@ class CointoCashApp {
             { required: 100, reward: 0.10, current: userReferrals }
         ];
         
-        const tasksQuests = [
-            { required: 50, reward: 0.03, current: userTotalTasks },
-            { required: 100, reward: 0.08, current: userTotalTasks },
-            { required: 250, reward: 0.20, current: userTotalTasks },
-            { required: 500, reward: 0.50, current: userTotalTasks }
-        ];
-        
         const nextFriendsQuest = friendsQuests.find(q => q.current < q.required) || friendsQuests[0];
-        const nextTasksQuest = tasksQuests.find(q => q.current < q.required) || tasksQuests[0];
         
         questsPage.innerHTML = `
             <div class="quests-container">
@@ -2878,13 +2750,6 @@ class CointoCashApp {
                     <h3><i class="fas fa-user-plus"></i> Friends Quests</h3>
                     <div id="friends-quests-list" class="quests-list">
                         ${this.renderQuestCard('friends', 0, nextFriendsQuest.required, nextFriendsQuest.reward, nextFriendsQuest.current)}
-                    </div>
-                </div>
-                
-                <div class="quests-section">
-                    <h3><i class="fas fa-tasks"></i> Tasks Quests</h3>
-                    <div id="tasks-quests-list" class="quests-list">
-                        ${this.renderQuestCard('tasks', 0, nextTasksQuest.required, nextTasksQuest.reward, nextTasksQuest.current)}
                     </div>
                 </div>
             </div>
@@ -2977,8 +2842,7 @@ class CointoCashApp {
             }
             
             const rewards = {
-                friends: [0.01, 0.03, 0.05, 0.10],
-                tasks: [0.03, 0.08, 0.20, 0.50]
+                friends: [0.01, 0.03, 0.05, 0.10]
             };
             
             const rewardAmount = rewards[questType][questIndex];
@@ -3030,7 +2894,7 @@ class CointoCashApp {
         try {
             if (!this.db || !this.tgUser) return;
             
-            const referralsRef = await this.db.ref(`referrals/${this.tgUser.id}`).once('value');
+            const referralsRef = await this.db.ref(`friends/${this.tgUser.id}`).once('value');
             if (!referralsRef.exists()) return;
             
             const referrals = referralsRef.val();
@@ -3062,10 +2926,10 @@ class CointoCashApp {
         
         const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
-        const referralEarnings = this.safeNumber(this.referralEarnings || 0);
-        const canClaim = referralEarnings > 0.00001;
+        const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
+        const pendingRefEarnings = this.safeNumber(this.userState.RefEarnings || 0);
         
-        const recentReferrals = this.loadRecentReferralsForDisplay();
+        const recentReferrals = this.friendsList.slice(0, 10);
         
         referralsPage.innerHTML = `
             <div class="referrals-container">
@@ -3084,12 +2948,24 @@ class CointoCashApp {
                                 <i class="fas fa-gift"></i>
                             </div>
                             <div class="info-content">
-                                <h4>Earn ${this.settings.referralPercentage}% Commission</h4>
-                                <p>${this.settings.referralPercentage}% of your friends earnings</p>
+                                <h4>Get ${this.settings.referralBonus.toFixed(3)} TON</h4>
+                                <p>For each verified referral</p>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-icon">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="info-content">
+                                <h4>Earn ${this.settings.referralPercentage}% Bonus</h4>
+                                <p>From your referrals' earnings</p>
                             </div>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <div class="referral-stats-section">
+                    <h3><i class="fas fa-chart-bar"></i> Referrals Statistics</h3>
                     <div class="stats-grid-two">
                         <div class="stat-card">
                             <div class="stat-icon">
@@ -3106,20 +2982,25 @@ class CointoCashApp {
                             </div>
                             <div class="stat-info">
                                 <h4>Total Earnings</h4>
-                                <p class="stat-value">${referralEarnings.toFixed(4)} TON</p>
+                                <p class="stat-value">${referralEarnings.toFixed(3)} TON</p>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="pending-profits-card" style="background: #222222; border-radius: 16px; padding: 16px; margin-top: 15px;">
-                        <div class="pending-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <span style="font-weight: 700;"><i class="fas fa-coins"></i> Earnings</span>
-                            <span class="pending-amount" style="font-weight: 800; color: #3b82f6;">${referralEarnings.toFixed(3)} TON</span>
+                </div>
+                
+                <div class="referral-earnings-card">
+                    <div class="earnings-header">
+                        <div class="earnings-icon">
+                            <i class="fas fa-wallet"></i>
                         </div>
-                        <button class="claim-profits-btn ${canClaim ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${!canClaim ? 'disabled' : ''} style="width:100%; padding:14px; background:${canClaim ? '#3b82f6' : '#333333'}; border:none; border-radius:14px; color:white; font-weight:800; cursor:${canClaim ? 'pointer' : 'not-allowed'};">
-                            <i class="fas fa-arrow-down"></i> CLAIM
-                        </button>
+                        <div class="earnings-info">
+                            <h4>Referral Earnings</h4>
+                            <p class="earnings-amount">${pendingRefEarnings.toFixed(4)} TON</p>
+                        </div>
                     </div>
+                    <button class="claim-earnings-btn ${pendingRefEarnings > 0 ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${pendingRefEarnings <= 0 ? 'disabled' : ''}>
+                        <i class="fas fa-arrow-down"></i> CLAIM
+                    </button>
                 </div>
                 
                 <div class="last-referrals-section">
@@ -3135,33 +3016,24 @@ class CointoCashApp {
         `;
         
         this.setupReferralsPageEvents();
-        
-        const claimBtn = document.getElementById('claim-ref-earnings-btn');
-        if (claimBtn && canClaim) {
-            claimBtn.addEventListener('click', () => this.claimReferralEarnings());
-        }
     }
 
     renderReferralRow(referral) {
         return `
             <div class="referral-row">
                 <div class="referral-row-avatar">
-                    <img src="${this.settings.defaultUserIcon}" alt="User" 
+                    <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}" 
                          oncontextmenu="return false;" 
                          ondragstart="return false;">
                 </div>
                 <div class="referral-row-info">
-                    <p class="referral-row-username">User ${referral.id.substring(0, 8)}</p>
+                    <p class="referral-row-username">${this.escapeHtml(referral.firstName)}</p>
                 </div>
-                <div class="referral-row-status verified">
-                    COMPLETED
+                <div class="referral-row-status ${referral.bonusGiven ? 'verified' : 'pending'}">
+                    ${referral.bonusGiven ? 'COMPLETED' : 'PENDING'}
                 </div>
             </div>
         `;
-    }
-
-    loadRecentReferralsForDisplay() {
-        return [];
     }
 
     setupReferralsPageEvents() {
@@ -3179,6 +3051,13 @@ class CointoCashApp {
                     copyBtn.classList.remove('copied');
                     copyBtn.innerHTML = originalText;
                 }, 2000);
+            });
+        }
+        
+        const claimBtn = document.getElementById('claim-ref-earnings-btn');
+        if (claimBtn && this.userState.RefEarnings > 0) {
+            claimBtn.addEventListener('click', () => {
+                this.claimRefEarnings();
             });
         }
     }
@@ -3457,6 +3336,15 @@ class CointoCashApp {
         }
     }
 
+    generateReferralCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 7; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return `COIN${code}`;
+    }
+
     safeNumber(value) {
         if (value === null || value === undefined) return 0;
         const num = Number(value);
@@ -3472,6 +3360,66 @@ class CointoCashApp {
         if (!name) return 'User';
         if (name.length <= maxLength) return name;
         return name.substring(0, maxLength) + '...';
+    }
+
+    async updateExistingUser(userRef, userData) {
+        await userRef.update({ 
+            firstName: this.getShortName(this.tgUser.first_name || 'User')
+        });
+        
+        if (userData.completedTasks && Array.isArray(userData.completedTasks)) {
+            this.userCompletedTasks = new Set(userData.completedTasks);
+        } else {
+            this.userCompletedTasks = new Set();
+            userData.completedTasks = [];
+            await userRef.update({ completedTasks: [] });
+        }
+        
+        const defaultData = {
+            status: userData.status || 'free',
+            referralEarnings: userData.referralEarnings || 0,
+            totalEarned: userData.totalEarned || 0,
+            totalWithdrawals: userData.totalWithdrawals || 0,
+            balance: userData.balance || 0,
+            referrals: userData.referrals || 0,
+            firebaseUid: this.auth?.currentUser?.uid || userData.firebaseUid || null,
+            welcomeTasksCompleted: userData.welcomeTasksCompleted || false,
+            RefEarnings: userData.RefEarnings || 0
+        };
+        
+        const updates = {};
+        Object.keys(defaultData).forEach(key => {
+            if (userData[key] === undefined) {
+                updates[key] = defaultData[key];
+                userData[key] = defaultData[key];
+            }
+        });
+        
+        if (Object.keys(updates).length > 0) {
+            await userRef.update(updates);
+        }
+        
+        return userData;
+    }
+
+    extractReferralId(startParam) {
+        if (!startParam) return null;
+        
+        if (!isNaN(startParam)) {
+            return parseInt(startParam);
+        } else if (startParam.includes('startapp=')) {
+            const match = startParam.match(/startapp=(\d+)/);
+            if (match && match[1]) {
+                return parseInt(match[1]);
+            }
+        } else if (startParam.includes('=')) {
+            const parts = startParam.split('=');
+            if (parts.length > 1 && !isNaN(parts[1])) {
+                return parseInt(parts[1]);
+            }
+        }
+        
+        return null;
     }
 }
 
