@@ -390,7 +390,6 @@ class TaskManager {
             }
             
             this.app.updateHeader();
-            this.app.renderQuestsPage();
             
             this.app.cache.delete(`tasks_${this.app.tgUser.id}`);
             this.app.cache.delete(`user_${this.app.tgUser.id}`);
@@ -399,7 +398,7 @@ class TaskManager {
             this.app.isProcessingTask = false;
 
             if (this.app.userState.referredBy) {
-                await this.app.addReferralEarning(this.app.userState.referredBy, taskReward);
+                await this.app.processReferralTaskBonus(this.app.userState.referredBy, taskReward);
             }
             
             return true;
