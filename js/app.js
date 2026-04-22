@@ -108,6 +108,7 @@ class CointoCashApp {
         this.pendingRefEarnings = 0;
         this.totalRefEarnings = 0;
         this.friendsList = [];
+        this.deviceId = null;
     }
 
     getRateLimiterClass() {
@@ -146,174 +147,234 @@ class CointoCashApp {
         };
     }
 
-                
+    async getDeviceId() {
+        let deviceId = localStorage.getItem('device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('device_id', deviceId);
+        }
+        return deviceId;
+    }
+
+    async checkDeviceAndRegister() {
+        try {
+            if (!this.db) return true;
             
-    
+            this.deviceId = await this.getDeviceId();
+            
+            const deviceRef = await this.db.ref(`devices/${this.deviceId}`).once('value');
+            
+            if (deviceRef.exists()) {
+                const deviceData = deviceRef.val();
+                const ownerId = deviceData.ownerId;
+                
+                if (ownerId && ownerId !== this.tgUser.id) {
+                    this.showDeviceBanPage();
+                    return false;
+                }
+                
+                await this.db.ref(`devices/${this.deviceId}`).update({
+                    lastSeen: Date.now(),
+                    lastUserId: this.tgUser.id
+                });
+            } else {
+                await this.db.ref(`devices/${this.deviceId}`).set({
+                    ownerId: this.tgUser.id,
+                    firstSeen: Date.now(),
+                    lastSeen: Date.now(),
+                    userAgent: navigator.userAgent
+                });
+            }
+            
+            return true;
+            
+        } catch (error) {
+            return true;
+        }
+    }
+
+    showDeviceBanPage() {
+        document.body.innerHTML = `
+            <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;z-index:10000;">
+                <div style="background:#111;border-radius:24px;padding:32px;text-align:center;border:1px solid #333;max-width:320px;">
+                    <div style="font-size:64px;color:#dc2626;margin-bottom:20px;"><i class="fas fa-ban"></i></div>
+                    <h2 style="color:#dc2626;margin-bottom:12px;">Device Restricted</h2>
+                    <p style="color:#9ca3af;margin-bottom:24px;">This device is already registered with another account. Multiple accounts per device are not allowed.</p>
+                    <button onclick="if(window.Telegram?.WebApp) window.Telegram.WebApp.close()" style="background:#dc2626;border:none;border-radius:50px;padding:12px 24px;color:white;font-weight:bold;cursor:pointer;">Close App</button>
+                </div>
+            </div>
+        `;
+    }
+
     async initialize() {
-    if (this.isInitializing || this.isInitialized) return;
-    
-    this.isInitializing = true;
-    
-    try {
-        this.showLoadingProgressWithMessage(5, "Loading...");
+        if (this.isInitializing || this.isInitialized) return;
         
-        if (!window.Telegram || !window.Telegram.WebApp) {
-            this.showError("Please open from Telegram Mini App");
-            return;
-        }
+        this.isInitializing = true;
         
-        this.tg = window.Telegram.WebApp;
-        
-        if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
-            this.showError("User data not available");
-            return;
-        }
-        
-        this.tgUser = this.tg.initDataUnsafe.user;
-        
-        this.showLoadingProgressWithMessage(10, "Loading...");
-        
-        this.showLoadingProgressWithMessage(15, "Loading...");
-        this.tg.ready();
-        this.tg.expand();
-        
-        this.showLoadingProgressWithMessage(20, "Loading...");
-        this.setupTelegramTheme();
-        
-        this.notificationManager = new NotificationManager();
-        
-        this.showLoadingProgressWithMessage(25, "Loading...");
-        
-        const firebaseSuccess = await this.initializeFirebase();
-        
-        if (firebaseSuccess) {
-            this.setupFirebaseAuth();
-        }
-        
-        this.showLoadingProgressWithMessage(35, "Loading...");
-        await this.loadSettingsFromFirebase();
-        
-        this.showLoadingProgressWithMessage(45, "Loading...");
-        await this.loadUserData();
-        
-        if (this.userState.status === 'ban') {
-            this.showBannedPage();
-            return;
-        }
-        
-        this.showLoadingProgressWithMessage(55, "Loading...");
-        
-        this.adManager = new AdManager(this);
-        this.taskManager = new TaskManager(this);
-        this.questManager = new QuestManager(this);
-        this.referralManager = new ReferralManager(this);
-        
-        this.startReferralMonitor();
-        
-        this.showLoadingProgressWithMessage(60, "Loading...");
         try {
-            await this.loadTasksData();
-        } catch (taskError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(70, "Loading...");
-        try {
-            await this.loadHistoryData();
-        } catch (historyError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(80, "Loading...");
-        try {
-            await this.loadAppStats();
-        } catch (statsError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(88, "Loading...");
-        try {
-            await this.loadAdTimers();
-            await this.loadUserCreatedTasks();
-            await this.loadReferralData();
-        } catch (adError) {
-            this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
-        }
-        
-        this.showLoadingProgressWithMessage(95, "Loading...");
-        this.renderUI();
-        
-        this.darkMode = true;
-        document.body.classList.add('dark-mode');
-        
-        this.isInitialized = true;
-        this.isInitializing = false;
-        
-        this.showLoadingProgressWithMessage(100, "Ready!");
-        
-        setTimeout(() => {
-            const appLoader = document.getElementById('app-loader');
-            const app = document.getElementById('app');
+            this.showLoadingProgressWithMessage(5, "Loading...");
             
-            if (appLoader) {
-                appLoader.style.opacity = '0';
-                appLoader.style.transition = 'opacity 0.5s ease';
-                
-                setTimeout(() => {
-                    appLoader.style.display = 'none';
-                }, 500);
+            if (!window.Telegram || !window.Telegram.WebApp) {
+                this.showError("Please open from Telegram Mini App");
+                return;
             }
             
-            if (app) {
-                app.style.display = 'block';
-                setTimeout(() => {
-                    app.style.opacity = '1';
-                    app.style.transition = 'opacity 0.3s ease';
-                }, 50);
+            this.tg = window.Telegram.WebApp;
+            
+            if (!this.tg.initDataUnsafe || !this.tg.initDataUnsafe.user) {
+                this.showError("User data not available");
+                return;
             }
             
-            this.showWelcomeTasksModal();
+            this.tgUser = this.tg.initDataUnsafe.user;
             
-        }, 500);
-        
-    } catch (error) {
-        this.notificationManager?.showNotification(
-            "Initialization Error",
-            "Error at: " + (error.message || "Unknown"),
-            "error"
-        );
-        
-        try {
-            this.userState = this.getDefaultUserState();
+            this.showLoadingProgressWithMessage(10, "Loading...");
+            this.tg.ready();
+            this.tg.expand();
+            
+            this.showLoadingProgressWithMessage(20, "Loading...");
+            this.setupTelegramTheme();
+            
+            this.notificationManager = new NotificationManager();
+            
+            this.showLoadingProgressWithMessage(25, "Loading...");
+            
+            const firebaseSuccess = await this.initializeFirebase();
+            
+            if (firebaseSuccess) {
+                this.setupFirebaseAuth();
+            }
+            
+            this.showLoadingProgressWithMessage(35, "Loading...");
+            await this.loadSettingsFromFirebase();
+            
+            this.showLoadingProgressWithMessage(45, "Loading...");
+            
+            const deviceAllowed = await this.checkDeviceAndRegister();
+            if (!deviceAllowed) {
+                this.isInitializing = false;
+                return;
+            }
+            
+            await this.loadUserData();
+            
+            if (this.userState.status === 'ban') {
+                this.showBannedPage();
+                return;
+            }
+            
+            this.showLoadingProgressWithMessage(55, "Loading...");
+            
+            this.adManager = new AdManager(this);
+            this.taskManager = new TaskManager(this);
+            this.questManager = new QuestManager(this);
+            this.referralManager = new ReferralManager(this);
+            
+            this.startReferralMonitor();
+            
+            this.showLoadingProgressWithMessage(60, "Loading...");
+            try {
+                await this.loadTasksData();
+            } catch (taskError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load tasks: " + taskError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(70, "Loading...");
+            try {
+                await this.loadHistoryData();
+            } catch (historyError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load history: " + historyError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(80, "Loading...");
+            try {
+                await this.loadAppStats();
+            } catch (statsError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load stats: " + statsError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(88, "Loading...");
+            try {
+                await this.loadAdTimers();
+                await this.loadUserCreatedTasks();
+                await this.loadReferralData();
+            } catch (adError) {
+                this.notificationManager?.showNotification("Warning", "Failed to load additional data: " + adError.message, "warning");
+            }
+            
+            this.showLoadingProgressWithMessage(95, "Loading...");
             this.renderUI();
             
-            const appLoader = document.getElementById('app-loader');
-            const app = document.getElementById('app');
+            this.darkMode = true;
+            document.body.classList.add('dark-mode');
             
-            if (appLoader) appLoader.style.display = 'none';
-            if (app) app.style.display = 'block';
+            this.isInitialized = true;
+            this.isInitializing = false;
             
-        } catch (renderError) {
-            this.showError("Failed to initialize app: " + error.message);
+            this.showLoadingProgressWithMessage(100, "Ready!");
+            
+            setTimeout(() => {
+                const appLoader = document.getElementById('app-loader');
+                const app = document.getElementById('app');
+                
+                if (appLoader) {
+                    appLoader.style.opacity = '0';
+                    appLoader.style.transition = 'opacity 0.5s ease';
+                    
+                    setTimeout(() => {
+                        appLoader.style.display = 'none';
+                    }, 500);
+                }
+                
+                if (app) {
+                    app.style.display = 'block';
+                    setTimeout(() => {
+                        app.style.opacity = '1';
+                        app.style.transition = 'opacity 0.3s ease';
+                    }, 50);
+                }
+                
+                this.showWelcomeTasksModal();
+                
+            }, 500);
+            
+        } catch (error) {
+            this.notificationManager?.showNotification(
+                "Initialization Error",
+                "Error at: " + (error.message || "Unknown"),
+                "error"
+            );
+            
+            try {
+                this.userState = this.getDefaultUserState();
+                this.renderUI();
+                
+                const appLoader = document.getElementById('app-loader');
+                const app = document.getElementById('app');
+                
+                if (appLoader) appLoader.style.display = 'none';
+                if (app) app.style.display = 'block';
+                
+            } catch (renderError) {
+                this.showError("Failed to initialize app: " + error.message);
+            }
+            
+            this.isInitializing = false;
+        }
+    }
+
+    showLoadingProgressWithMessage(percent, message) {
+        const progressBar = document.getElementById('loading-progress-bar');
+        if (progressBar) {
+            progressBar.style.width = percent + '%';
+            progressBar.style.transition = 'width 0.3s ease';
         }
         
-        this.isInitializing = false;
+        const loadingPercentage = document.getElementById('loading-percentage');
+        if (loadingPercentage) {
+            loadingPercentage.textContent = `${percent}% - ${message}`;
+        }
     }
-}
-
-showLoadingProgressWithMessage(percent, message) {
-    const progressBar = document.getElementById('loading-progress-bar');
-    if (progressBar) {
-        progressBar.style.width = percent + '%';
-        progressBar.style.transition = 'width 0.3s ease';
-    }
-    
-    const loadingPercentage = document.getElementById('loading-percentage');
-    if (loadingPercentage) {
-        loadingPercentage.textContent = `${percent}% - ${message}`;
-    }
-}
-    
 
     async loadWelcomeTasksFromFirebase() {
         try {
@@ -583,7 +644,8 @@ showLoadingProgressWithMessage(percent, message) {
             status: 'free',
             lastUpdated: Date.now(),
             firebaseUid: this.auth?.currentUser?.uid || null,
-            RefEarnings: 0
+            RefEarnings: 0,
+            totalTasks: 0
         };
     }
 
@@ -628,7 +690,8 @@ showLoadingProgressWithMessage(percent, message) {
             createdAt: Date.now(),
             status: 'free',
             firebaseUid: this.auth?.currentUser?.uid || null,
-            RefEarnings: 0
+            RefEarnings: 0,
+            totalTasks: 0
         };
         
         await userRef.set(userData);
@@ -2734,6 +2797,7 @@ showLoadingProgressWithMessage(percent, message) {
         if (!questsPage) return;
         
         const userReferrals = this.safeNumber(this.userState.referrals || 0);
+        const userTotalTasks = this.safeNumber(this.userState.totalTasks || 0);
         
         const friendsQuests = [
             { required: 10, reward: 0.01, current: userReferrals },
@@ -2742,7 +2806,15 @@ showLoadingProgressWithMessage(percent, message) {
             { required: 100, reward: 0.10, current: userReferrals }
         ];
         
+        const tasksQuests = [
+            { required: 50, reward: 0.03, current: userTotalTasks },
+            { required: 100, reward: 0.08, current: userTotalTasks },
+            { required: 250, reward: 0.20, current: userTotalTasks },
+            { required: 500, reward: 0.50, current: userTotalTasks }
+        ];
+        
         const nextFriendsQuest = friendsQuests.find(q => q.current < q.required) || friendsQuests[0];
+        const nextTasksQuest = tasksQuests.find(q => q.current < q.required) || tasksQuests[0];
         
         questsPage.innerHTML = `
             <div class="quests-container">
@@ -2750,6 +2822,13 @@ showLoadingProgressWithMessage(percent, message) {
                     <h3><i class="fas fa-user-plus"></i> Friends Quests</h3>
                     <div id="friends-quests-list" class="quests-list">
                         ${this.renderQuestCard('friends', 0, nextFriendsQuest.required, nextFriendsQuest.reward, nextFriendsQuest.current)}
+                    </div>
+                </div>
+                
+                <div class="quests-section">
+                    <h3><i class="fas fa-tasks"></i> Tasks Quests</h3>
+                    <div id="tasks-quests-list" class="quests-list">
+                        ${this.renderQuestCard('tasks', 0, nextTasksQuest.required, nextTasksQuest.reward, nextTasksQuest.current)}
                     </div>
                 </div>
             </div>
@@ -2842,7 +2921,8 @@ showLoadingProgressWithMessage(percent, message) {
             }
             
             const rewards = {
-                friends: [0.01, 0.03, 0.05, 0.10]
+                friends: [0.01, 0.03, 0.05, 0.10],
+                tasks: [0.03, 0.08, 0.20, 0.50]
             };
             
             const rewardAmount = rewards[questType][questIndex];
@@ -3384,7 +3464,8 @@ showLoadingProgressWithMessage(percent, message) {
             referrals: userData.referrals || 0,
             firebaseUid: this.auth?.currentUser?.uid || userData.firebaseUid || null,
             welcomeTasksCompleted: userData.welcomeTasksCompleted || false,
-            RefEarnings: userData.RefEarnings || 0
+            RefEarnings: userData.RefEarnings || 0,
+            totalTasks: userData.totalTasks || 0
         };
         
         const updates = {};
