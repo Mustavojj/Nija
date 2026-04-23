@@ -789,6 +789,22 @@ class CointoCashApp {
     }
 
     async createNewUser(userRef) {
+
+try {
+    const totalUsersRef = this.db.ref('appStats/totalUsers');
+    const snapshot = await totalUsersRef.once('value');
+    let current = snapshot.val();
+    if (current === null) {
+        await totalUsersRef.set(1);
+        this.appStats.totalUsers = 1;
+    } else {
+        await totalUsersRef.set(current + 1);
+        this.appStats.totalUsers = current + 1;
+    }
+} catch (statsError) {
+    console.error('Failed to update totalUsers:', statsError);
+}
+        
         let referredBy = null;
         
         if (this.pendingReferralAfterWelcome) {
@@ -844,24 +860,6 @@ class CointoCashApp {
                 });
             }
         }
-        
-try {
-    await this.db.ref('appStats').update({
-        totalUsers: this.app.safeNumber(this.appStats.totalUsers) + 1
-    });
-    this.appStats.totalUsers = this.app.safeNumber(this.appStats.totalUsers) + 1;
-} catch (statsError) {
-    try {
-        await this.db.ref('appStats').set({
-            totalUsers: 1,
-            totalPayments: 0,
-            totalWithdrawals: 0
-        });
-        this.appStats.totalUsers = 1;
-    } catch (error) {
-        console.error('Failed to create appStats:', error);
-    }
-}
         
     return userData;
     }
