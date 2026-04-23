@@ -2925,3 +2925,12 @@ body, button, input, .form-input, .task-btn, .withdraw-btn, .copy-btn, .promo-bt
 .form-label {
     font-weight: 700 !important;
     }
+
+.referral-row-status.pending {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+.referral-row-status.verified {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+} 
