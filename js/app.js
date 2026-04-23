@@ -717,9 +717,9 @@ class CointoCashApp {
             const referrerRef = this.db.ref(`users/${referrerId}`);
             const referrerSnapshot = await referrerRef.once('value');
             if (referrerSnapshot.exists()) {
-                const currentFriends = referrerSnapshot.val().referrals || 0;
+                const currentReferrals = referrerSnapshot.val().referrals || 0;
                 await referrerRef.update({
-                    referrals: currentFriends + 1
+                    referrals: currentReferrals + 1
                 });
             }
             
@@ -771,6 +771,45 @@ class CointoCashApp {
         await this.updateAppStats('totalUsers', 1);
         
         return userData;
+    }
+
+    async addReferralEarningsToReferrer(userId, earnings) {
+        try {
+            if (!this.db) return;
+            if (!earnings || earnings <= 0) return;
+            
+            const userRef = await this.db.ref(`users/${userId}`).once('value');
+            if (!userRef.exists()) return;
+            
+            const userData = userRef.val();
+            const referrerId = userData.referredBy;
+            
+            if (!referrerId || referrerId === userId) return;
+            
+            const percentage = this.settings.referralPercentage;
+            const bonusAmount = earnings * (percentage / 100);
+            
+            if (bonusAmount <= 0) return;
+            
+            const referrerRef = this.db.ref(`users/${referrerId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            
+            if (referrerSnapshot.exists()) {
+                const currentRefEarnings = this.safeNumber(referrerSnapshot.val().RefEarnings || 0);
+                const newRefEarnings = currentRefEarnings + bonusAmount;
+                
+                await referrerRef.update({
+                    RefEarnings: newRefEarnings
+                });
+                
+                if (referrerId === this.tgUser.id) {
+                    this.pendingRefEarnings = newRefEarnings;
+                    this.userState.RefEarnings = newRefEarnings;
+                    this.renderReferralsPage();
+                }
+            }
+        } catch (error) {
+        }
     }
 
     async loadReferralData() {
@@ -2624,6 +2663,8 @@ class CointoCashApp {
                 });
                 
                 await this.db.ref(`config/promoCodes/${promoData.id}/usedCount`).transaction(current => (current || 0) + 1);
+                
+                await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
             }
             
             this.userState.balance = newBalance;
@@ -2703,6 +2744,8 @@ class CointoCashApp {
                         balance: newBalance,
                         totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
+                    
+                    await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
                 }
                 
                 this.userState.balance = newBalance;
@@ -2776,6 +2819,8 @@ class CointoCashApp {
                         balance: newBalance,
                         totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
+                    
+                    await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
                 }
                 
                 this.userState.balance = newBalance;
@@ -3000,6 +3045,8 @@ class CointoCashApp {
                     claimedAt: Date.now(),
                     reward: rewardAmount
                 });
+                
+                await this.addReferralEarningsToReferrer(this.tgUser.id, rewardAmount);
             }
             
             this.userState.balance = newBalance;
