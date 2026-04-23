@@ -86,7 +86,7 @@ class CointoCashApp {
             ad2: 0
         };
         
-        this.adCooldown = 600000;
+        this.adCooldown = 60000;
         
         this.referralMonitorInterval = null;
         
