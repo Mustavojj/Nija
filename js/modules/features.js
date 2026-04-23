@@ -252,46 +252,7 @@ class TaskManager {
             const chatId = this.extractChatIdFromUrl(url);
             
             if (task.type === 'channel' || task.type === 'group') {
-                if (chatId) {
-                    const isBotAdmin = await this.checkBotAdminStatus(chatId);
-                    
-                    if (isBotAdmin) {
-                        const isSubscribed = await this.checkUserMembershipWithBot(chatId);
-                        
-                        if (isSubscribed) {
-                            await this.completeTask(taskId, taskType, task.reward, button);
-                        } else {
-                            this.app.notificationManager.showNotification(
-                                "Join Required", 
-                                "You need to join the channel/group first!", 
-                                "error"
-                            );
-                            
-                            this.enableAllTaskButtons();
-                            this.app.isProcessingTask = false;
-                            
-                            if (button) {
-                                button.innerHTML = 'Try Again';
-                                button.disabled = false;
-                                button.classList.remove('check');
-                                button.classList.add('start');
-                                
-                                const newButton = button.cloneNode(true);
-                                button.parentNode.replaceChild(newButton, button);
-                                
-                                newButton.addEventListener('click', async (e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    await this.handleTask(taskId, url, taskType, task.reward, newButton);
-                                });
-                            }
-                        }
-                    } else {
-                        this.app.notificationManager.showNotification(
-                            "Task Completed!", 
-                            `You have received ${task.reward.toFixed(5)} TON`, 
-                            "success"
-                        );
+                
                         
                         await this.completeTask(taskId, taskType, task.reward, button);
                     }
