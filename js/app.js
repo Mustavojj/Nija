@@ -2475,41 +2475,68 @@ class CointoCashApp {
         });
     }
 
-    async loadSocialTasks() {
-        const socialTab = document.getElementById('social-tasks-list');
-        if (!socialTab) return;
+async loadSocialTasks() {
+    const socialTab = document.getElementById('social-tasks-list');
+    if (!socialTab) return;
+    
+    try {
+        let allSocialTasks = [];
         
-        try {
-            let userTasks = this.userCreatedTasks || [];
-            let socialTasks = [];
-            
-            if (this.taskManager) {
-                socialTasks = await this.taskManager.loadTasksFromDatabase('social');
+        if (this.db) {
+            const userTasksSnapshot = await this.db.ref('config/userTasks').once('value');
+            if (userTasksSnapshot.exists()) {
+                userTasksSnapshot.forEach(userTaskSnapshot => {
+                    userTaskSnapshot.forEach(taskSnapshot => {
+                        const task = taskSnapshot.val();
+                        if (task.category === 'social' && task.status === 'active') {
+                            if (!this.userCompletedTasks.has(taskSnapshot.key)) {
+                                allSocialTasks.push({
+                                    id: taskSnapshot.key,
+                                    ...task
+                                });
+                            }
+                        }
+                    });
+                });
             }
             
-            const allSocialTasks = [...socialTasks, ...userTasks];
-            
-            if (allSocialTasks.length > 0) {
-                const tasksHTML = allSocialTasks.map(task => this.renderTaskCard(task)).join('');
-                socialTab.innerHTML = tasksHTML;
-                this.setupTaskButtons();
-            } else {
-                socialTab.innerHTML = `
-                    <div class="no-tasks">
-                        <i class="fas fa-users"></i>
-                        <p>No social tasks available now</p>
-                   </div>
-                `;
+            const tasksSnapshot = await this.db.ref('config/tasks').once('value');
+            if (tasksSnapshot.exists()) {
+                tasksSnapshot.forEach(child => {
+                    const task = child.val();
+                    if (task.category === 'social' && task.status === 'active') {
+                        if (!this.userCompletedTasks.has(child.key)) {
+                            allSocialTasks.push({
+                                id: child.key,
+                                ...task
+                            });
+                        }
+                    }
+                });
             }
-        } catch (error) {
+        }
+        
+        if (allSocialTasks.length > 0) {
+            const tasksHTML = allSocialTasks.map(task => this.renderTaskCard(task)).join('');
+            socialTab.innerHTML = tasksHTML;
+            this.setupTaskButtons();
+        } else {
             socialTab.innerHTML = `
                 <div class="no-tasks">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading social tasks</p>
+                    <i class="fas fa-users"></i>
+                    <p>No social tasks available now</p>
                 </div>
             `;
         }
+    } catch (error) {
+        socialTab.innerHTML = `
+            <div class="no-tasks">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error loading social tasks</p>
+            </div>
+        `;
     }
+}
 
     async loadPartnerTasks() {
         const partnerTab = document.getElementById('partner-tasks-list');
