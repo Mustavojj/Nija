@@ -717,9 +717,9 @@ class CointoCashApp {
             const referrerRef = this.db.ref(`users/${referrerId}`);
             const referrerSnapshot = await referrerRef.once('value');
             if (referrerSnapshot.exists()) {
-                const currentReferrals = referrerSnapshot.val().referrals || 0;
+                const currentFriends = referrerSnapshot.val().referrals || 0;
                 await referrerRef.update({
-                    referrals: currentReferrals + 1
+                    referrals: currentFriends + 1
                 });
             }
             
@@ -753,10 +753,17 @@ class CointoCashApp {
             firstName: this.tgUser.first_name,
             photoUrl: this.settings.defaultUserIcon,
             balance: 0,
+            referrals: 0,
             referredBy: null,
+            totalEarned: 0,
+            totalWithdrawals: 0,
+            referralEarnings: 0,
+            completedTasks: [],
             createdAt: Date.now(),
             status: 'free',
             firebaseUid: this.auth?.currentUser?.uid || null,
+            RefEarnings: 0,
+            totalTasks: 0,
             welcomeTasksCompleted: false
         };
         
@@ -764,45 +771,6 @@ class CointoCashApp {
         await this.updateAppStats('totalUsers', 1);
         
         return userData;
-    }
-
-    async addReferralEarningsToReferrer(userId, earnings) {
-        try {
-            if (!this.db) return;
-            if (!earnings || earnings <= 0) return;
-            
-            const userRef = await this.db.ref(`users/${userId}`).once('value');
-            if (!userRef.exists()) return;
-            
-            const userData = userRef.val();
-            const referrerId = userData.referredBy;
-            
-            if (!referrerId || referrerId === userId) return;
-            
-            const percentage = this.settings.referralPercentage;
-            const bonusAmount = earnings * (percentage / 100);
-            
-            if (bonusAmount <= 0) return;
-            
-            const referrerRef = this.db.ref(`users/${referrerId}`);
-            const referrerSnapshot = await referrerRef.once('value');
-            
-            if (referrerSnapshot.exists()) {
-                const currentRefEarnings = this.safeNumber(referrerSnapshot.val().RefEarnings || 0);
-                const newRefEarnings = currentRefEarnings + bonusAmount;
-                
-                await referrerRef.update({
-                    RefEarnings: newRefEarnings
-                });
-                
-                if (referrerId === this.tgUser.id) {
-                    this.pendingRefEarnings = newRefEarnings;
-                    this.userState.RefEarnings = newRefEarnings;
-                    this.renderReferralsPage();
-                }
-            }
-        } catch (error) {
-        }
     }
 
     async loadReferralData() {
@@ -1085,7 +1053,7 @@ class CointoCashApp {
                 
                 <div class="welcome-footer">
                     <button class="check-welcome-btn" id="check-welcome-btn" disabled>
-                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(2)} TON
+                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(3)} TON
                     </button>
                 </div>
             </div>
@@ -2656,8 +2624,6 @@ class CointoCashApp {
                 });
                 
                 await this.db.ref(`config/promoCodes/${promoData.id}/usedCount`).transaction(current => (current || 0) + 1);
-                
-                await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
             }
             
             this.userState.balance = newBalance;
@@ -2737,8 +2703,6 @@ class CointoCashApp {
                         balance: newBalance,
                         totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
-                    
-                    await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
                 }
                 
                 this.userState.balance = newBalance;
@@ -2812,8 +2776,6 @@ class CointoCashApp {
                         balance: newBalance,
                         totalEarned: this.safeNumber(this.userState.totalEarned) + reward
                     });
-                    
-                    await this.addReferralEarningsToReferrer(this.tgUser.id, reward);
                 }
                 
                 this.userState.balance = newBalance;
@@ -3038,8 +3000,6 @@ class CointoCashApp {
                     claimedAt: Date.now(),
                     reward: rewardAmount
                 });
-                
-                await this.addReferralEarningsToReferrer(this.tgUser.id, rewardAmount);
             }
             
             this.userState.balance = newBalance;
@@ -3104,7 +3064,7 @@ class CointoCashApp {
         const referralsPage = document.getElementById('referrals-page');
         if (!referralsPage) return;
         
-        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
+        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
         const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
         const pendingRefEarnings = this.safeNumber(this.userState.RefEarnings || 0);
@@ -3175,7 +3135,7 @@ class CointoCashApp {
                         </div>
                         <div class="earnings-info">
                             <h4>Referral Earnings</h4>
-                            <p class="earnings-amount">${pendingRefEarnings.toFixed(5)} TON</p>
+                            <p class="earnings-amount">${pendingRefEarnings.toFixed(4)} TON</p>
                         </div>
                     </div>
                     <button class="claim-earnings-btn ${pendingRefEarnings > 0 ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${pendingRefEarnings <= 0 ? 'disabled' : ''}>
@@ -3199,28 +3159,28 @@ class CointoCashApp {
     }
 
     renderReferralRow(referral) {
-    const status = referral.bonusGiven ? 'VERIFIED' : 'PENDING';
-    const statusClass = referral.bonusGiven ? 'verified' : 'pending';
-    
-    return `
-        <div class="referral-row">
-            <div class="referral-row-avatar">
-                <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}">
+        return `
+            <div class="referral-row">
+                <div class="referral-row-avatar">
+                    <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}" 
+                         oncontextmenu="return false;" 
+                         ondragstart="return false;">
+                </div>
+                <div class="referral-row-info">
+                    <p class="referral-row-username">${this.escapeHtml(referral.firstName)}</p>
+                </div>
+                <div class="referral-row-status ${referral.bonusGiven ? 'verified' : 'pending'}">
+                    ${referral.bonusGiven ? 'COMPLETED' : 'PENDING'}
+                </div>
             </div>
-            <div class="referral-row-info">
-                <p class="referral-row-username">${this.escapeHtml(referral.firstName)}</p>
-            </div>
-            <div class="referral-row-status ${statusClass}">
-                ${status}
-            </div>
-        </div>
-    `;
-}
+        `;
+    }
+
     setupReferralsPageEvents() {
         const copyBtn = document.getElementById('copy-referral-link-btn');
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
-                const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
+                const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
                 this.copyToClipboard(referralLink);
                 
                 copyBtn.classList.add('copied');
