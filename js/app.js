@@ -1,3 +1,4 @@
+// app.js
 const DEFAULT_SETTINGS = {
     tonWallet: "TON-WALLET",
     minimumWithdraw: 0.05,
@@ -442,9 +443,8 @@ class CointoCashApp {
             
             this.referralProcessed = true;
             
-            
         } catch (error) {
-            
+            this.referralRegistrationError = `Failed to register referral: ${error.message}`;
         }
     }
 
@@ -1150,7 +1150,7 @@ class CointoCashApp {
                 
                 <div class="welcome-footer">
                     <button class="check-welcome-btn" id="check-welcome-btn" disabled>
-                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(2)} TON
+                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(3)} TON
                     </button>
                 </div>
             </div>
@@ -2481,12 +2481,13 @@ class CointoCashApp {
         if (!socialTab) return;
         
         try {
+            let userTasks = this.userCreatedTasks || [];
             let socialTasks = [];
+            
             if (this.taskManager) {
                 socialTasks = await this.taskManager.loadTasksFromDatabase('social');
             }
             
-            const userTasks = this.userCreatedTasks || [];
             const allSocialTasks = [...socialTasks, ...userTasks];
             
             if (allSocialTasks.length > 0) {
