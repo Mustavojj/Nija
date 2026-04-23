@@ -251,23 +251,8 @@ class TaskManager {
             
             const chatId = this.extractChatIdFromUrl(url);
             
-            if (task.type === 'channel' || task.type === 'group') {
-                
-                        
-                        await this.completeTask(taskId, taskType, task.reward, button);
-                    }
-                } else {
-                    this.app.notificationManager.showNotification(
-                        "Task Completed!", 
-                        `You have received ${task.reward.toFixed(5)} TON`, 
-                        "success"
-                    );
-                    
-                    await this.completeTask(taskId, taskType, task.reward, button);
-                }
-            } else {
-                await this.completeTask(taskId, taskType, task.reward, button);
-            }
+            // التحقق معطل مؤقتًا - يعطي المكافأة مباشرة
+            await this.completeTask(taskId, taskType, task.reward, button);
             
         } catch (error) {
             this.enableAllTaskButtons();
@@ -361,6 +346,8 @@ class TaskManager {
             if (this.app.userState.referredBy) {
                 await this.app.processReferralTaskBonus(this.app.userState.referredBy, taskReward);
             }
+            
+            this.app.notificationManager.showNotification("Task Completed!", `${taskReward.toFixed(5)} TON added`, "success");
             
             return true;
             
