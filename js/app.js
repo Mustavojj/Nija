@@ -846,10 +846,12 @@ class CointoCashApp {
         }
         
         try {
-            await this.updateAppStats('totalUsers', 1);
-        } catch (statsError) {}
-        
-        return userData;
+            await this.db.ref('appStats/totalUsers').transaction(current => (current || 0) + 1);
+            this.appStats.totalUsers = (this.appStats.totalUsers || 0) + 1;
+        } catch (statsError) {
+        }
+    
+    return userData;
     }
 
     async checkUserExists(userId) {
