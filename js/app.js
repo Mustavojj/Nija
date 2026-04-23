@@ -25,7 +25,7 @@ const APP_CONFIG = {
     REFERRAL_BONUS_TASKS: 0,
     TASK_REWARD_BONUS: 0,
     MAX_DAILY_ADS: 999999,
-    AD_COOLDOWN: 60000
+    AD_COOLDOWN: 120000
 };
 
 import { CacheManager, NotificationManager, SecurityManager, AdManager } from './modules/core.js';
@@ -86,7 +86,7 @@ class CointoCashApp {
             ad2: 0
         };
         
-        this.adCooldown = 60000;
+        this.adCooldown = 120000;
         
         this.referralMonitorInterval = null;
         
