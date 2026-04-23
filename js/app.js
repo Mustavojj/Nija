@@ -443,19 +443,9 @@ class CointoCashApp {
             
             this.referralProcessed = true;
             
-            this.notificationManager?.showNotification(
-                "Referral Applied",
-                `You were referred by user #${referralId}`,
-                "success"
-            );
             
         } catch (error) {
-            this.referralRegistrationError = `Failed to register referral: ${error.message}`;
-            this.notificationManager?.showNotification(
-                "Referral Error",
-                this.referralRegistrationError,
-                "error"
-            );
+            
         }
     }
 
@@ -1161,7 +1151,7 @@ class CointoCashApp {
                 
                 <div class="welcome-footer">
                     <button class="check-welcome-btn" id="check-welcome-btn" disabled>
-                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(3)} TON
+                        <i class="fas fa-check-circle"></i> Check & Get ${totalReward.toFixed(2)} TON
                     </button>
                 </div>
             </div>
