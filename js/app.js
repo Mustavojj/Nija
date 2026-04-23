@@ -845,11 +845,16 @@ class CointoCashApp {
             }
         }
         
-        try {
-            await this.db.ref('appStats/totalUsers').transaction(current => (current || 0) + 1);
-            this.appStats.totalUsers = (this.appStats.totalUsers || 0) + 1;
-        } catch (statsError) {
-        }
+
+try {
+    const totalUsersRef = this.db.ref('appStats/totalUsers');
+    const snapshot = await totalUsersRef.once('value');
+    const currentTotal = snapshot.val() || 0;
+    await totalUsersRef.set(currentTotal + 1);
+    this.appStats.totalUsers = currentTotal + 1;
+} catch (statsError) {
+    console.error('Failed to update totalUsers:', statsError);
+}
     
     return userData;
     }
