@@ -3199,23 +3199,23 @@ class CointoCashApp {
     }
 
     renderReferralRow(referral) {
-        return `
-            <div class="referral-row">
-                <div class="referral-row-avatar">
-                    <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}" 
-                         oncontextmenu="return false;" 
-                         ondragstart="return false;">
-                </div>
-                <div class="referral-row-info">
-                    <p class="referral-row-username">${this.escapeHtml(referral.firstName)}</p>
-                </div>
-                <div class="referral-row-status ${referral.bonusGiven ? 'verified' : 'pending'}">
-                    ${referral.bonusGiven ? 'COMPLETED' : 'PENDING'}
-                </div>
+    const status = referral.bonusGiven ? 'VERIFIED' : 'PENDING';
+    const statusClass = referral.bonusGiven ? 'verified' : 'pending';
+    
+    return `
+        <div class="referral-row">
+            <div class="referral-row-avatar">
+                <img src="${referral.photoUrl || this.settings.defaultUserIcon}" alt="${referral.firstName}">
             </div>
-        `;
-    }
-
+            <div class="referral-row-info">
+                <p class="referral-row-username">${this.escapeHtml(referral.firstName)}</p>
+            </div>
+            <div class="referral-row-status ${statusClass}">
+                ${status}
+            </div>
+        </div>
+    `;
+}
     setupReferralsPageEvents() {
         const copyBtn = document.getElementById('copy-referral-link-btn');
         if (copyBtn) {
