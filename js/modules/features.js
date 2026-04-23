@@ -73,7 +73,8 @@ class TaskManager {
                             category: category,
                             reward: this.app.safeNumber(taskData.reward || 0.001),
                             currentCompletions: taskData.currentCompletions || 0,
-                            maxCompletions: taskData.maxCompletions || 999999
+                            maxCompletions: taskData.maxCompletions || 999999,
+                            verification: taskData.verification || 'NO'
                         };
                         
                         if (!this.app.userCompletedTasks.has(task.id)) {
@@ -249,7 +250,15 @@ class TaskManager {
                 throw new Error("Task not found");
             }
             
-            if (task.category === 'social') {
+            let shouldVerify = false;
+            
+            if (task.category === 'social' && task.verification === 'YES') {
+                shouldVerify = true;
+            } else if (task.category === 'partner') {
+                shouldVerify = true;
+            }
+            
+            if (!shouldVerify) {
                 await this.completeTask(taskId, taskType, task.reward, button);
                 return;
             }
@@ -297,22 +306,13 @@ class TaskManager {
             this.app.isProcessingTask = false;
             
             if (button) {
-                button.innerHTML = 'Try Again';
-                button.disabled = false;
-                button.classList.remove('check');
-                button.classList.add('start');
-                
-                const newButton = button.cloneNode(true);
-                button.parentNode.replaceChild(newButton, button);
-                
-                newButton.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    await this.handleTask(taskId, url, taskType, reward, newButton);
-                });
+                button.innerHTML = 'COMPLETED';
+                button.disabled = true;
+                button.classList.remove('check', 'start');
+                button.classList.add('completed');
             }
             
-            this.app.notificationManager.showNotification("Error", "Failed to verify task completion", "error");
+            await this.completeTask(taskId, taskType, reward, button);
         }
     }
 
