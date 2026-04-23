@@ -1,4 +1,3 @@
-// features.js
 const FEATURES_CONFIG = {
     TASK_VERIFICATION_DELAY: 10,
     REFERRAL_BONUS_TON: 0.003,
@@ -247,6 +246,21 @@ class TaskManager {
                 }
             }
             
+            if (!task && this.app.db) {
+                const userTasksSnapshot = await this.app.db.ref('config/userTasks').once('value');
+                if (userTasksSnapshot.exists()) {
+                    userTasksSnapshot.forEach(userTaskSnapshot => {
+                        userTaskSnapshot.forEach(taskSnapshot => {
+                            if (taskSnapshot.key === taskId) {
+                                task = taskSnapshot.val();
+                                task.id = taskId;
+                                task.category = 'social';
+                            }
+                        });
+                    });
+                }
+            }
+            
             if (!task) {
                 throw new Error("Task not found");
             }
@@ -321,6 +335,21 @@ class TaskManager {
                 }
             }
             
+            if (!task && this.app.db) {
+                const userTasksSnapshot = await this.app.db.ref('config/userTasks').once('value');
+                if (userTasksSnapshot.exists()) {
+                    userTasksSnapshot.forEach(userTaskSnapshot => {
+                        userTaskSnapshot.forEach(taskSnapshot => {
+                            if (taskSnapshot.key === taskId) {
+                                task = taskSnapshot.val();
+                                task.id = taskId;
+                                task.category = 'social';
+                            }
+                        });
+                    });
+                }
+            }
+            
             if (!task) {
                 throw new Error("Task not found");
             }
@@ -346,7 +375,11 @@ class TaskManager {
             
             await this.app.db.ref(`users/${this.app.tgUser.id}`).update(updates);
             
-            await this.app.db.ref(`config/tasks/${taskId}/currentCompletions`).transaction(current => (current || 0) + 1);
+            if (task.category === 'partner') {
+                await this.app.db.ref(`config/tasks/${taskId}/currentCompletions`).transaction(current => (current || 0) + 1);
+            } else if (task.owner) {
+                await this.app.db.ref(`config/userTasks/${task.owner}/${taskId}/currentCompletions`).transaction(current => (current || 0) + 1);
+            }
             
             this.app.userState.balance = currentBalance + taskReward;
             this.app.userState.totalEarned = totalEarned + taskReward;
