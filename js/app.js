@@ -110,6 +110,7 @@ class CointoCashApp {
         this.friendsList = [];
         this.deviceId = null;
         this.referralProcessed = false;
+        this.referralRegistrationError = null;
     }
 
     getRateLimiterClass() {
@@ -257,7 +258,7 @@ class CointoCashApp {
                 return;
             }
             
-            await this.processReferralBeforeUserCreation();
+            await this.processReferralRegistration();
             
             await this.loadUserData();
             
@@ -337,6 +338,14 @@ class CointoCashApp {
                     }, 50);
                 }
                 
+                if (this.referralRegistrationError) {
+                    this.notificationManager?.showNotification(
+                        "Referral Notice",
+                        this.referralRegistrationError,
+                        "warning"
+                    );
+                }
+                
                 this.showWelcomeTasksModal();
                 
             }, 500);
@@ -366,7 +375,7 @@ class CointoCashApp {
         }
     }
 
-    async processReferralBeforeUserCreation() {
+    async processReferralRegistration() {
         if (this.referralProcessed) return;
         
         try {
@@ -380,12 +389,12 @@ class CointoCashApp {
                 }
             }
             
-            if (!referralId || referralId <= 0 || referralId === this.tgUser.id) {
+            if (!referralId || referralId <= 0) {
                 return;
             }
             
-            const userExists = await this.checkUserExists(referralId);
-            if (!userExists) {
+            if (referralId === this.tgUser.id) {
+                this.referralRegistrationError = "You cannot refer yourself.";
                 return;
             }
             
@@ -393,6 +402,24 @@ class CointoCashApp {
             const userSnapshot = await userRef.once('value');
             
             if (userSnapshot.exists()) {
+                const existingReferredBy = userSnapshot.val().referredBy;
+                if (existingReferredBy) {
+                    return;
+                }
+            }
+            
+            const referrerRef = this.db.ref(`users/${referralId}`);
+            const referrerSnapshot = await referrerRef.once('value');
+            
+            if (!referrerSnapshot.exists()) {
+                this.referralRegistrationError = `Referrer user ${referralId} not found in database.`;
+                return;
+            }
+            
+            const referrerData = referrerSnapshot.val();
+            
+            if (referrerData.status === 'ban') {
+                this.referralRegistrationError = "Cannot refer from a banned account.";
                 return;
             }
             
@@ -405,20 +432,29 @@ class CointoCashApp {
                 bonusGiven: false
             });
             
-            this.pendingReferralAfterWelcome = referralId;
+            if (userSnapshot.exists()) {
+                await userRef.update({
+                    referredBy: referralId
+                });
+            } else {
+                this.pendingReferralAfterWelcome = referralId;
+            }
+            
             this.referralProcessed = true;
             
+            this.notificationManager?.showNotification(
+                "Referral Applied",
+                `You were referred by user #${referralId}`,
+                "success"
+            );
+            
         } catch (error) {
-        }
-    }
-
-    async checkUserExists(userId) {
-        try {
-            if (!this.db) return false;
-            const userRef = await this.db.ref(`users/${userId}`).once('value');
-            return userRef.exists();
-        } catch (error) {
-            return false;
+            this.referralRegistrationError = `Failed to register referral: ${error.message}`;
+            this.notificationManager?.showNotification(
+                "Referral Error",
+                this.referralRegistrationError,
+                "error"
+            );
         }
     }
 
@@ -469,6 +505,11 @@ class CointoCashApp {
             this.pendingReferralAfterWelcome = null;
             
         } catch (error) {
+            this.notificationManager?.showNotification(
+                "Referral Bonus Error",
+                "Failed to register referral bonus after welcome tasks: " + error.message,
+                "error"
+            );
         }
     }
 
@@ -802,14 +843,17 @@ class CointoCashApp {
         await userRef.set(userData);
         
         if (referredBy && !this.pendingReferralAfterWelcome) {
-            await this.db.ref(`friends/${referredBy}/${this.tgUser.id}`).set({
-                userId: this.tgUser.id,
-                username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
-                firstName: this.getShortName(this.tgUser.first_name || ''),
-                photoUrl: this.settings.defaultUserIcon,
-                joinedAt: Date.now(),
-                bonusGiven: false
-            });
+            const existingFriend = await this.db.ref(`friends/${referredBy}/${this.tgUser.id}`).once('value');
+            if (!existingFriend.exists()) {
+                await this.db.ref(`friends/${referredBy}/${this.tgUser.id}`).set({
+                    userId: this.tgUser.id,
+                    username: this.tgUser.username ? `@${this.tgUser.username}` : 'No Username',
+                    firstName: this.getShortName(this.tgUser.first_name || ''),
+                    photoUrl: this.settings.defaultUserIcon,
+                    joinedAt: Date.now(),
+                    bonusGiven: false
+                });
+            }
         }
         
         try {
@@ -817,6 +861,16 @@ class CointoCashApp {
         } catch (statsError) {}
         
         return userData;
+    }
+
+    async checkUserExists(userId) {
+        try {
+            if (!this.db) return false;
+            const userRef = await this.db.ref(`users/${userId}`).once('value');
+            return userRef.exists();
+        } catch (error) {
+            return false;
+        }
     }
 
     async loadReferralData() {
