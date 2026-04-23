@@ -249,6 +249,11 @@ class TaskManager {
                 throw new Error("Task not found");
             }
             
+            if (task.category === 'social') {
+                await this.completeTask(taskId, taskType, task.reward, button);
+                return;
+            }
+            
             const chatId = this.extractChatIdFromUrl(url);
             let isBotAdmin = false;
             
