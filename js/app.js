@@ -787,37 +787,26 @@ class CointoCashApp {
             totalTasks: 0
         };
     }
-
-
-    async updateTotalUsers() {
-    try {
-        const usersSnapshot = await this.db.ref('users').once('value');
-        const userCount = usersSnapshot.numChildren();
-        await this.db.ref('appStats/totalUsers').set(userCount);
-        this.appStats.totalUsers = userCount;
-        return userCount;
-    } catch (error) {
-        console.error('Failed to count users:', error);
-        return 0;
-    }
-}
     
     async createNewUser(userRef) {
         
         try {
-            await this.db.ref('appStats/totalUsers').set(this.app.safeNumber(this.appStats.totalUsers) + 1);
-        } catch (e) {
-            
-            try {
-                await this.db.ref('appStats').set({
-                    totalUsers: 1,
-                    totalPayments: 0,
-                    totalWithdrawals: 0
-                });
-            } catch (e2) {}
-        }
+    const snapshot = await this.db.ref('appStats/totalUsers').once('value');
+    let currentTotal = snapshot.val();
+    
+    if (currentTotal === null) {
+        currentTotal = 0;
+    }
+    
+    const newTotal = currentTotal + 1;
+    await this.db.ref('appStats/totalUsers').set(newTotal);
+    this.appStats.totalUsers = newTotal;
+    
+} catch (error) {
+    console.error('Failed to update totalUsers:', error);
+    this.appStats.totalUsers = (this.appStats.totalUsers || 0) + 1;
+}
         
-this.appStats.totalUsers = this.app.safeNumber(this.appStats.totalUsers) + 1;
         let referredBy = null;
         
         if (this.pendingReferralAfterWelcome) {
