@@ -804,8 +804,20 @@ class CointoCashApp {
     
     async createNewUser(userRef) {
         
-        await this.updateTotalUsers();
+        try {
+            await this.db.ref('appStats/totalUsers').set(this.app.safeNumber(this.appStats.totalUsers) + 1);
+        } catch (e) {
+            
+            try {
+                await this.db.ref('appStats').set({
+                    totalUsers: 1,
+                    totalPayments: 0,
+                    totalWithdrawals: 0
+                });
+            } catch (e2) {}
+        }
         
+this.appStats.totalUsers = this.app.safeNumber(this.appStats.totalUsers) + 1;
         let referredBy = null;
         
         if (this.pendingReferralAfterWelcome) {
