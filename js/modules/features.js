@@ -1,3 +1,4 @@
+// features.js
 const FEATURES_CONFIG = {
     TASK_VERIFICATION_DELAY: 10,
     REFERRAL_BONUS_TON: 0.003,
@@ -250,15 +251,7 @@ class TaskManager {
                 throw new Error("Task not found");
             }
             
-            let shouldVerify = false;
-            
-            if (task.category === 'social' && task.verification === 'YES') {
-                shouldVerify = true;
-            } else if (task.category === 'partner') {
-                shouldVerify = true;
-            }
-            
-            if (!shouldVerify) {
+            if (task.category === 'social') {
                 await this.completeTask(taskId, taskType, task.reward, button);
                 return;
             }
