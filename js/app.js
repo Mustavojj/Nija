@@ -3104,7 +3104,7 @@ class CointoCashApp {
         const referralsPage = document.getElementById('referrals-page');
         if (!referralsPage) return;
         
-        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
+        const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
         const referrals = this.safeNumber(this.userState.referrals || 0);
         const referralEarnings = this.safeNumber(this.userState.referralEarnings || 0);
         const pendingRefEarnings = this.safeNumber(this.userState.RefEarnings || 0);
@@ -3175,7 +3175,7 @@ class CointoCashApp {
                         </div>
                         <div class="earnings-info">
                             <h4>Referral Earnings</h4>
-                            <p class="earnings-amount">${pendingRefEarnings.toFixed(4)} TON</p>
+                            <p class="earnings-amount">${pendingRefEarnings.toFixed(5)} TON</p>
                         </div>
                     </div>
                     <button class="claim-earnings-btn ${pendingRefEarnings > 0 ? '' : 'disabled'}" id="claim-ref-earnings-btn" ${pendingRefEarnings <= 0 ? 'disabled' : ''}>
@@ -3220,7 +3220,7 @@ class CointoCashApp {
         const copyBtn = document.getElementById('copy-referral-link-btn');
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
-                const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/earn?startapp=${this.tgUser.id}`;
+                const referralLink = `https://t.me/${this.appConfig.BOT_USERNAME}/app?startapp=${this.tgUser.id}`;
                 this.copyToClipboard(referralLink);
                 
                 copyBtn.classList.add('copied');
