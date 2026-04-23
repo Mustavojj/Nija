@@ -1,4 +1,3 @@
-// app.js
 const DEFAULT_SETTINGS = {
     tonWallet: "TON-WALLET",
     minimumWithdraw: 0.05,
