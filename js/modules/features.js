@@ -250,9 +250,42 @@ class TaskManager {
             }
             
             const chatId = this.extractChatIdFromUrl(url);
+            let isBotAdmin = false;
             
-            // التحقق معطل مؤقتًا - يعطي المكافأة مباشرة
-            await this.completeTask(taskId, taskType, task.reward, button);
+            if (chatId) {
+                isBotAdmin = await this.checkBotAdminStatus(chatId);
+            }
+            
+            if (isBotAdmin) {
+                const isSubscribed = await this.checkUserMembershipWithBot(chatId);
+                
+                if (isSubscribed) {
+                    await this.completeTask(taskId, taskType, task.reward, button);
+                } else {
+                    this.app.notificationManager.showNotification("Join Required", "Please join the channel/group first!", "error");
+                    
+                    this.enableAllTaskButtons();
+                    this.app.isProcessingTask = false;
+                    
+                    if (button) {
+                        button.innerHTML = 'Try Again';
+                        button.disabled = false;
+                        button.classList.remove('check');
+                        button.classList.add('start');
+                        
+                        const newButton = button.cloneNode(true);
+                        button.parentNode.replaceChild(newButton, button);
+                        
+                        newButton.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            await this.handleTask(taskId, url, taskType, task.reward, newButton);
+                        });
+                    }
+                }
+            } else {
+                await this.completeTask(taskId, taskType, task.reward, button);
+            }
             
         } catch (error) {
             this.enableAllTaskButtons();
