@@ -1731,16 +1731,16 @@ class CointoCashApp {
         tasksPage.innerHTML = `
             <div id="tasks-content">
                 <div class="tasks-tabs">
-                    <button class="tab-btn active" data-tab="social-tab">
-                        <i class="fas fa-users"></i> Social
-                    </button>
-                    <button class="tab-btn" data-tab="partner-tab">
-                        <i class="fas fa-handshake"></i> Partner
-                    </button>
-                    <button class="tab-btn" data-tab="more-tab">
-                        <i class="fas fa-ellipsis-h"></i> More
-                    </button>
-                </div>
+    <button class="tab-btn active" data-tab="more-tab">
+        <i class="fas fa-ellipsis-h"></i> More
+    </button>
+    <button class="tab-btn" data-tab="social-tab">
+        <i class="fas fa-users"></i> Social
+    </button>
+    <button class="tab-btn" data-tab="partner-tab">
+        <i class="fas fa-handshake"></i> Partner
+    </button>
+</div>
                 
                 <div id="social-tab" class="tasks-tab-content active">
                     <div class="task-category">
