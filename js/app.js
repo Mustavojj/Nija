@@ -1498,9 +1498,9 @@ class CointoCashApp {
         if (loadingPercentage) {
             loadingPercentage.textContent = `${percent}%`;
         }
-    }
+   }
 
-    showError(message) {
+     showError(message) {
         document.body.innerHTML = `
             <div class="error-container">
                 <div class="error-content">
@@ -1729,20 +1729,20 @@ class CointoCashApp {
         if (!tasksPage) return;
         
         tasksPage.innerHTML = `
-            <div id="tasks-content">
-                <div class="tasks-tabs">
+        <div id="tasks-content">
+            <div class="tasks-tabs">
     <button class="tab-btn active" data-tab="more-tab">
-        <i class="fas fa-ellipsis-h"></i> More
-    </button>
+            <i class="fas fa-ellipsis-h"></i> More
+            </button>
     <button class="tab-btn" data-tab="social-tab">
         <i class="fas fa-users"></i> Social
-    </button>
+            </button>
     <button class="tab-btn" data-tab="partner-tab">
         <i class="fas fa-handshake"></i> Partner
-    </button>
-</div>
+           </button>
+    </div>
                 
-                <div id="social-tab" class="tasks-tab-content active">
+                <div id="social-tab" class="tasks-tab-content">
                     <div class="task-category">
                         <div class="task-category-header">
                             <h3 class="task-category-title">
@@ -1767,7 +1767,7 @@ class CointoCashApp {
                     </div>
                 </div>
                 
-                <div id="more-tab" class="tasks-tab-content">
+                <div id="more-tab" class="tasks-tab-content active">
                     <div class="promo-card">
                         <div class="promo-header">
                             <div class="promo-icon">
