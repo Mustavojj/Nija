@@ -338,13 +338,7 @@ class CointoCashApp {
                     }, 50);
                 }
                 
-                if (this.referralRegistrationError) {
-                    this.notificationManager?.showNotification(
-                        "Referral Notice",
-                        this.referralRegistrationError,
-                        "warning"
-                    );
-                }
+                
                 
                 this.showWelcomeTasksModal();
                 
