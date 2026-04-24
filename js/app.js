@@ -3524,14 +3524,14 @@ async loadSocialTasks() {
                 
                 const requestData = {
                     userId: this.tgUser.id,
-                    userName: this.userState.firstName,
-                    username: this.userState.username,
+                    userName: this.tgUser.first_name || 'User',
+                    username: this.tgUser.username || '',
                     walletAddress: walletAddress,
                     amount: amount,
                     status: 'pending',
                     createdAt: Date.now()
                 };
-                
+
                 await this.db.ref('withdrawals/pending').push(requestData);
             }
             
