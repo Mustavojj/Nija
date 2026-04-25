@@ -488,11 +488,7 @@ class CointoCashApp {
             this.pendingReferralAfterWelcome = null;
             
         } catch (error) {
-            this.notificationManager?.showNotification(
-                "Referral Bonus Error",
-                "Failed to register referral bonus after welcome tasks: " + error.message,
-                "error"
-            );
+            
         }
     }
 
@@ -1790,7 +1786,7 @@ class CointoCashApp {
                         </div>
                         <div class="ad-reward">
                             <img src="${this.settings.tonIcon}" alt="TON">
-                            <span>Reward: ${this.settings.adRewardTon.toFixed(3)} TON</span>
+                            <span>Reward: ${this.settings.adRewardTon.toFixed(4)} TON</span>
                         </div>
                         <button class="ad-btn ${this.isAdAvailable(1) ? 'available' : 'cooldown'}" 
                                 id="watch-ad-1-btn"
@@ -1807,7 +1803,7 @@ class CointoCashApp {
                         </div>
                         <div class="ad-reward">
                             <img src="${this.settings.tonIcon}" alt="TON">
-                            <span>Reward: ${this.settings.adRewardTon.toFixed(3)} TON</span>
+                            <span>Reward: ${this.settings.adRewardTon.toFixed(4)} TON</span>
                         </div>
                         <button class="ad-btn ${this.isAdAvailable(2) ? 'available' : 'cooldown'}" 
                                 id="watch-ad-2-btn"
