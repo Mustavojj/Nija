@@ -340,7 +340,7 @@ class CointoCashApp {
                 
                 
                 
-                this.showWelcomeTasksModal();
+                
                 
             }, 500);
             
